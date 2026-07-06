@@ -1,0 +1,10 @@
+data_dir: /kaggle/working/data
+raw_dir: /kaggle/working/data/raw
+processed_dir: /kaggle/working/data/processed
+indices_dir: /kaggle/working/data/indices
+manifest_path: /kaggle/working/data/pdfs_manifest.json
+clause_index_path: /kaggle/working/data/clause_index.json
+chunks_path: /kaggle/working/data/processed/chunks.jsonl
+embedding_model: BAAI/bge-m3
+chat_model: Qwen/Qwen3-4B
+retrieval_top_k: 6

@@ -1,0 +1,21 @@
+[
+  {
+    "id": "tax_audit_001",
+    "question": "What does Form 3CD clause 44 require?",
+    "category": "tax_audit",
+    "correct_sources": ["ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"],
+    "expected_sections": ["form_3cd:44"],
+    "difficulty": "easy",
+    "correct_answer": ""
+  },
+  {
+    "id": "audit_001",
+    "question": "What does SA 500 say about audit evidence?",
+    "category": "audit",
+    "correct_sources": ["ICAI_SA_500_Audit_Evidence.pdf"],
+    "expected_sections": ["audit_standard:sa_500"],
+    "difficulty": "easy",
+    "correct_answer": ""
+  }
+]
+
