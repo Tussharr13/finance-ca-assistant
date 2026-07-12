@@ -37,6 +37,18 @@ def test_chunks_from_processed_pdf_adds_ids_metadata_and_references():
     assert chunks[0]["references"] == ["form_3cd:44"]
 
 
+def test_chunks_from_processed_pdf_stops_at_limit():
+    processed = ProcessedPDF(
+        source="large.pdf",
+        path="/tmp/large.pdf",
+        pages=[PageText(page=1, text="One.\n\nTwo.\n\nThree.\n\nFour.")],
+    )
+
+    chunks = chunks_from_processed_pdf(processed, max_chunks=2)
+
+    assert len(chunks) == 2
+
+
 def test_write_chunks_jsonl_round_trips(tmp_path):
     chunks = [{"id": "c1", "source": "x.pdf", "page": 1, "text": "AS 22 applies."}]
     output = tmp_path / "chunks.jsonl"

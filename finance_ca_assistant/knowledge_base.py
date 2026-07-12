@@ -10,7 +10,7 @@ from typing import Dict, Iterable, List, Mapping, Optional
 
 from finance_ca_assistant.config import AppConfig, DEFAULT_SOURCE_URLS, ensure_directories, load_config
 from finance_ca_assistant.ingestion.pdf_downloader import PDFDownloader
-from finance_ca_assistant.ingestion.pdf_processor import PDFProcessor, ProcessedPDF
+from finance_ca_assistant.ingestion.pdf_processor import PDFProcessor, ProcessedPDF, format_process_rss
 from finance_ca_assistant.ingestion.source_registry import SourceRegistry
 from finance_ca_assistant.logger import get_logger
 from finance_ca_assistant.pipeline import RAGPipeline
@@ -53,8 +53,12 @@ def chunks_from_processed_pdf(
     processed_pdf: ProcessedPDF,
     chunker: Optional[SemanticChunker] = None,
     metadata_builder: Optional[MetadataBuilder] = None,
+    max_chunks: Optional[int] = None,
 ) -> List[Dict[str, object]]:
     """Convert extracted PDF pages into enriched chunk dictionaries."""
+
+    if max_chunks is not None and max_chunks <= 0:
+        raise ValueError("max_chunks must be positive when provided")
 
     selected_chunker = chunker or SemanticChunker(max_chars=1200, overlap=150)
     selected_metadata_builder = metadata_builder or MetadataBuilder()
@@ -72,6 +76,8 @@ def chunks_from_processed_pdf(
                 "document_type": document_type,
             }
             chunks.append(selected_metadata_builder.enrich_chunk(record))
+            if max_chunks is not None and len(chunks) >= max_chunks:
+                return chunks
 
     return chunks
 
@@ -135,15 +141,17 @@ def build_chunks_from_pdf_paths(
         if processed.errors and not processed.pages:
             failed_pdfs.append({"path": str(pdf_path), "error": "; ".join(processed.errors)})
             continue
-        pdf_chunks = chunks_from_processed_pdf(processed)
-        if max_chunks_per_source is not None:
-            pdf_chunks = pdf_chunks[:max_chunks_per_source]
+        pdf_chunks = chunks_from_processed_pdf(
+            processed,
+            max_chunks=max_chunks_per_source,
+        )
         chunks.extend(pdf_chunks)
         logger.info(
-            "Built %s chunks from %s (%s text pages)",
+            "Built %s chunks from %s (%s text pages); RSS=%s",
             len(pdf_chunks),
             pdf_path.name,
             processed.metadata.get("text_page_count", len(processed.pages)),
+            format_process_rss(),
         )
         del processed
         del pdf_chunks
