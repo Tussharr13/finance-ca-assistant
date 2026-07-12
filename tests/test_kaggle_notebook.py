@@ -11,6 +11,20 @@ def _load_notebook_cells():
     return json.loads(notebook_path.read_text(encoding="utf-8"))["cells"]
 
 
+def test_kaggle_section_1_purges_stale_package_modules():
+    cells = _load_notebook_cells()
+    section_source = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in cells
+        if cell.get("cell_type") == "code"
+    )
+
+    assert "del sys.modules[module_name]" in section_source
+    assert "importlib.invalidate_caches()" in section_source
+    assert '"rev-parse", "--short", "HEAD"' in section_source
+    assert "inspect.signature(build_knowledge_base_from_sources)" in section_source
+
+
 def test_kaggle_section_3_reuses_cache_and_has_safe_limits():
     cells = _load_notebook_cells()
     start = next(
