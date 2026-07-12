@@ -50,6 +50,8 @@ chunk cache or opt into rebuilding only when sources or ingestion settings chang
 PDF text extraction prefers PyMuPDF and clears its document cache every five
 pages to keep Kaggle RAM bounded; `pypdf` is retained only as a compatibility
 fallback.
+The Kaggle setup cell installs only missing ingestion packages with `--no-deps`
+so it does not re-resolve or upgrade Kaggle's preinstalled CUDA/RAPIDS stack.
 
 ## Hugging Face Model Stack
 

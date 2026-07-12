@@ -23,6 +23,8 @@ def test_kaggle_section_1_purges_stale_package_modules():
     assert "importlib.invalidate_caches()" in section_source
     assert '"rev-parse", "--short", "HEAD"' in section_source
     assert "inspect.signature(build_knowledge_base_from_sources)" in section_source
+    assert '"--no-deps"' in section_source
+    assert "sentence-transformers>=3.0" not in section_source
 
 
 def test_kaggle_section_3_reuses_cache_and_has_safe_limits():
