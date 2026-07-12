@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -116,13 +117,14 @@ def build_chunks_from_pdf_paths(
     pdf_paths: Iterable[str | Path],
     max_pages_per_pdf: Optional[int] = None,
     max_chunks_per_source: Optional[int] = None,
+    pdf_backend: str = "auto",
 ) -> tuple[List[Dict[str, object]], List[Dict[str, str]]]:
     """Process local PDFs and return chunks plus failures."""
 
     if max_chunks_per_source is not None and max_chunks_per_source <= 0:
         raise ValueError("max_chunks_per_source must be positive when provided")
 
-    processor = PDFProcessor()
+    processor = PDFProcessor(backend=pdf_backend)
     chunks: List[Dict[str, object]] = []
     failed_pdfs: List[Dict[str, str]] = []
     pdf_path_list = [Path(pdf_path) for pdf_path in pdf_paths]
@@ -143,6 +145,9 @@ def build_chunks_from_pdf_paths(
             pdf_path.name,
             processed.metadata.get("text_page_count", len(processed.pages)),
         )
+        del processed
+        del pdf_chunks
+        gc.collect()
 
     return chunks, failed_pdfs
 
@@ -153,6 +158,7 @@ def build_knowledge_base_from_sources(
     limit: Optional[int] = None,
     max_pages_per_pdf: Optional[int] = None,
     max_chunks_per_source: Optional[int] = None,
+    pdf_backend: str = "auto",
     rebuild: bool = True,
     build_artifacts: bool = True,
 ) -> KnowledgeBaseBuildResult:
@@ -193,7 +199,12 @@ def build_knowledge_base_from_sources(
 
     for source_id, url in selected_sources:
         try:
-            result = downloader.download(url, target_name=safe_pdf_name(source_id), use_cache_on_failure=True)
+            result = downloader.download(
+                url,
+                target_name=safe_pdf_name(source_id),
+                use_cache_on_failure=True,
+                prefer_cache=not rebuild,
+            )
             registry.register_source(source_id, result.path)
             pdf_paths.append(str(result.path))
             logger.info("Ready source %s -> %s", source_id, result.path)
@@ -205,6 +216,7 @@ def build_knowledge_base_from_sources(
         pdf_paths,
         max_pages_per_pdf=max_pages_per_pdf,
         max_chunks_per_source=max_chunks_per_source,
+        pdf_backend=pdf_backend,
     )
     write_chunks_jsonl(chunks, selected_config.chunks_path)
     artifact_paths: Dict[str, str] = {}

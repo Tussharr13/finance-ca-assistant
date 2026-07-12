@@ -44,6 +44,7 @@ def test_kaggle_section_3_reuses_cache_and_has_safe_limits():
     assert "SOURCE_LIMIT = 3" in section_source
     assert "MAX_PAGES_PER_PDF = 30" in section_source
     assert "MAX_CHUNKS_PER_SOURCE = 300" in section_source
+    assert 'PDF_BACKEND = "pymupdf"' in section_source
     assert "REBUILD_KB = False" in section_source
     assert "build_artifacts=False" in section_source
 

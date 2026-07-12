@@ -47,6 +47,9 @@ In Kaggle, add your Hugging Face token as a Secret named exactly `HF_TOKEN`.
 Do not paste the token into notebook code. Section 3 defaults to three sources,
 30 pages per PDF, 300 chunks per source, and `REBUILD_KB = False`. Delete the
 chunk cache or opt into rebuilding only when sources or ingestion settings change.
+PDF text extraction prefers PyMuPDF and clears its document cache every five
+pages to keep Kaggle RAM bounded; `pypdf` is retained only as a compatibility
+fallback.
 
 ## Hugging Face Model Stack
 

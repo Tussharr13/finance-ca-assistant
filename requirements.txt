@@ -1,4 +1,5 @@
 pypdf>=4.0
+pymupdf>=1.24
 numpy>=1.24
 requests>=2.31
 pyyaml>=6.0
