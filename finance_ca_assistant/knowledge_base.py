@@ -30,6 +30,7 @@ class KnowledgeBaseBuildResult:
     failed_sources: List[Dict[str, str]] = field(default_factory=list)
     failed_pdfs: List[Dict[str, str]] = field(default_factory=list)
     artifact_paths: Dict[str, str] = field(default_factory=dict)
+    reused_chunks: bool = False
 
 
 def infer_document_type(source_name: str) -> str:
@@ -85,11 +86,41 @@ def write_chunks_jsonl(chunks: Iterable[Mapping[str, object]], output_path: str 
     return str(path)
 
 
+def load_chunks_jsonl(path: str | Path) -> List[Dict[str, object]]:
+    """Load chunk dictionaries from a JSONL artifact."""
+
+    chunk_path = Path(path)
+    if not chunk_path.exists():
+        raise FileNotFoundError(f"Chunk cache not found: {chunk_path}")
+
+    chunks: List[Dict[str, object]] = []
+    with chunk_path.open("r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip():
+                continue
+            try:
+                chunk = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ValueError(
+                    f"Invalid chunk JSON at {chunk_path}:{line_number}: {error.msg}"
+                ) from error
+            if not isinstance(chunk, dict):
+                raise ValueError(
+                    f"Chunk cache row must be an object at {chunk_path}:{line_number}"
+                )
+            chunks.append(chunk)
+    return chunks
+
+
 def build_chunks_from_pdf_paths(
     pdf_paths: Iterable[str | Path],
     max_pages_per_pdf: Optional[int] = None,
+    max_chunks_per_source: Optional[int] = None,
 ) -> tuple[List[Dict[str, object]], List[Dict[str, str]]]:
     """Process local PDFs and return chunks plus failures."""
+
+    if max_chunks_per_source is not None and max_chunks_per_source <= 0:
+        raise ValueError("max_chunks_per_source must be positive when provided")
 
     processor = PDFProcessor()
     chunks: List[Dict[str, object]] = []
@@ -103,6 +134,8 @@ def build_chunks_from_pdf_paths(
             failed_pdfs.append({"path": str(pdf_path), "error": "; ".join(processed.errors)})
             continue
         pdf_chunks = chunks_from_processed_pdf(processed)
+        if max_chunks_per_source is not None:
+            pdf_chunks = pdf_chunks[:max_chunks_per_source]
         chunks.extend(pdf_chunks)
         logger.info(
             "Built %s chunks from %s (%s text pages)",
@@ -119,16 +152,36 @@ def build_knowledge_base_from_sources(
     source_urls: Optional[Mapping[str, str]] = None,
     limit: Optional[int] = None,
     max_pages_per_pdf: Optional[int] = None,
+    max_chunks_per_source: Optional[int] = None,
+    rebuild: bool = True,
+    build_artifacts: bool = True,
 ) -> KnowledgeBaseBuildResult:
     """Download authoritative PDFs, process them, and save RAG artifacts.
 
-    This is the main Kaggle entry point. It uses cache fallback for downloads,
-    writes ``chunks.jsonl``, then builds a local deterministic-embedding
-    pipeline and saves deployment artifacts under ``config.indices_dir``.
+    This is the main Kaggle entry point. When ``rebuild`` is false, an existing
+    ``chunks.jsonl`` is returned before any source download or PDF processing.
+    Artifact construction can be disabled so ingestion and model indexing happen
+    in separate notebook stages.
     """
 
     selected_config = config or load_config()
     ensure_directories(selected_config)
+
+    if not rebuild and selected_config.chunks_path.exists():
+        cached_chunks = load_chunks_jsonl(selected_config.chunks_path)
+        if cached_chunks:
+            logger.info(
+                "Reusing %s cached chunks from %s",
+                len(cached_chunks),
+                selected_config.chunks_path,
+            )
+            return KnowledgeBaseBuildResult(
+                pdf_paths=[],
+                chunks=cached_chunks,
+                reused_chunks=True,
+            )
+        logger.warning("Chunk cache is empty; rebuilding %s", selected_config.chunks_path)
+
     selected_sources = list((source_urls or DEFAULT_SOURCE_URLS).items())
     if limit is not None:
         selected_sources = selected_sources[:limit]
@@ -151,10 +204,11 @@ def build_knowledge_base_from_sources(
     chunks, failed_pdfs = build_chunks_from_pdf_paths(
         pdf_paths,
         max_pages_per_pdf=max_pages_per_pdf,
+        max_chunks_per_source=max_chunks_per_source,
     )
     write_chunks_jsonl(chunks, selected_config.chunks_path)
     artifact_paths: Dict[str, str] = {}
-    if chunks:
+    if chunks and build_artifacts:
         pipeline = RAGPipeline.from_chunks(chunks)
         artifact_paths = pipeline.save_artifacts(selected_config.indices_dir)
 

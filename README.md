@@ -36,16 +36,17 @@ The notebook now does the real MVP flow:
 
 1. Locates the `finance_ca_assistant` package.
 2. Loads `HF_TOKEN` from Kaggle Secrets when present.
-3. Downloads the default ICAI/CBIC PDF corpus.
-4. Extracts text and creates CA-aware chunks.
-5. Builds the hybrid retrieval pipeline with staged Hugging Face providers.
-6. Tests Form 3CD clause retrieval.
+3. Reuses cached chunks or builds a bounded ICAI/CBIC corpus with safe defaults.
+4. Extracts text and creates CA-aware chunks without building throwaway embeddings.
+5. Builds the hybrid retrieval pipeline once with staged Hugging Face providers.
+6. Tests AS 1 retrieval against the bounded corpus.
 7. Runs an agentic CA consultation turn.
 8. Saves chunks, embeddings, and clause index artifacts under Kaggle working.
 
 In Kaggle, add your Hugging Face token as a Secret named exactly `HF_TOKEN`.
-Do not paste the token into notebook code. Use `MAX_PAGES_PER_PDF` only when
-debugging memory/runtime issues.
+Do not paste the token into notebook code. Section 3 defaults to three sources,
+30 pages per PDF, 300 chunks per source, and `REBUILD_KB = False`. Delete the
+chunk cache or opt into rebuilding only when sources or ingestion settings change.
 
 ## Hugging Face Model Stack
 

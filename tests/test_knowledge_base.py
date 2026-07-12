@@ -1,9 +1,11 @@
-import json
-
+from finance_ca_assistant.config import AppConfig
 from finance_ca_assistant.ingestion.pdf_processor import PageText, ProcessedPDF
 from finance_ca_assistant.knowledge_base import (
+    build_chunks_from_pdf_paths,
+    build_knowledge_base_from_sources,
     chunks_from_processed_pdf,
     infer_document_type,
+    load_chunks_jsonl,
     write_chunks_jsonl,
 )
 
@@ -41,5 +43,59 @@ def test_write_chunks_jsonl_round_trips(tmp_path):
 
     write_chunks_jsonl(chunks, output)
 
-    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
-    assert rows == chunks
+    assert load_chunks_jsonl(output) == chunks
+
+
+def test_build_chunks_from_pdf_paths_caps_chunks_per_source(monkeypatch, tmp_path):
+    processed = ProcessedPDF(
+        source="sample.pdf",
+        path=str(tmp_path / "sample.pdf"),
+        pages=[
+            PageText(page=1, text="First paragraph.\n\nSecond paragraph.\n\nThird paragraph."),
+        ],
+    )
+    monkeypatch.setattr(
+        "finance_ca_assistant.knowledge_base.PDFProcessor.process",
+        lambda self, path, max_pages=None: processed,
+    )
+
+    chunks, failures = build_chunks_from_pdf_paths(
+        [tmp_path / "sample.pdf"],
+        max_chunks_per_source=2,
+    )
+
+    assert not failures
+    assert len(chunks) == 2
+
+
+def test_build_knowledge_base_reuses_cached_chunks_before_download(monkeypatch, tmp_path):
+    chunks = [{"id": "cached", "source": "cached.pdf", "page": 1, "text": "Cached text"}]
+    config = AppConfig(
+        data_dir=tmp_path,
+        raw_dir=tmp_path / "raw",
+        processed_dir=tmp_path / "processed",
+        indices_dir=tmp_path / "indices",
+        manifest_path=tmp_path / "manifest.json",
+        clause_index_path=tmp_path / "clause_index.json",
+        chunks_path=tmp_path / "processed/chunks.jsonl",
+    )
+    write_chunks_jsonl(chunks, config.chunks_path)
+
+    def fail_download(*args, **kwargs):
+        raise AssertionError("cached build must not download sources")
+
+    monkeypatch.setattr(
+        "finance_ca_assistant.knowledge_base.PDFDownloader.download",
+        fail_download,
+    )
+
+    result = build_knowledge_base_from_sources(
+        config=config,
+        source_urls={"unused": "https://example.com/unused.pdf"},
+        rebuild=False,
+        build_artifacts=False,
+    )
+
+    assert result.reused_chunks is True
+    assert result.chunks == chunks
+    assert result.pdf_paths == []
