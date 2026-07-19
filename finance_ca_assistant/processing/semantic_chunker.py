@@ -55,11 +55,23 @@ class SemanticChunker:
         start = 0
         while start < len(block):
             hard_end = min(start + self.max_chars, len(block))
-            end = _choose_boundary(block, start, hard_end)
-            yield block[start:end].strip()
+            # The last window must consume the remainder. Choosing a boundary
+            # inside it and then applying overlap can otherwise return to the
+            # same ``start`` forever when only a trailing character remains.
+            end = (
+                len(block)
+                if hard_end >= len(block)
+                else _choose_boundary(block, start, hard_end)
+            )
+            part = block[start:end].strip()
+            if part:
+                yield part
             if end >= len(block):
                 break
-            start = max(0, end - self.overlap)
+            next_start = max(0, end - self.overlap)
+            # Be defensive if a future boundary strategy returns a split too
+            # close to the current start to accommodate the configured overlap.
+            start = next_start if next_start > start else end
 
 
 def _split_by_heading(text: str, pattern: str) -> List[str]:
@@ -69,10 +81,11 @@ def _split_by_heading(text: str, pattern: str) -> List[str]:
 
 def _choose_boundary(text: str, start: int, hard_end: int) -> int:
     minimum = start + int((hard_end - start) * 0.65)
-    best = -1
+    best_end = -1
     for marker in ["\n\n", ". ", "; ", "\n"]:
         candidate = text.rfind(marker, minimum, hard_end)
-        if candidate > best:
-            best = candidate + len(marker)
-    return best if best > minimum else hard_end
-
+        if candidate >= 0:
+            candidate_end = candidate + len(marker)
+            if candidate_end > best_end:
+                best_end = candidate_end
+    return best_end if best_end > minimum else hard_end
