@@ -45,7 +45,7 @@ class PDFProcessor:
         self,
         backend: str = "auto",
         max_page_text_chars: int = 500_000,
-        cache_shrink_interval: int = 5,
+        cache_shrink_interval: int = 10,
     ) -> None:
         if backend not in {"auto", "pymupdf", "pypdf"}:
             raise ValueError("backend must be auto, pymupdf, or pypdf")
@@ -119,7 +119,6 @@ class PDFProcessor:
 
                 if (page_index + 1) % self.cache_shrink_interval == 0:
                     pymupdf.TOOLS.store_shrink(100)
-                    gc.collect()
                     logger.info(
                         "Extracted %s/%s pages from %s; RSS=%s",
                         page_index + 1,

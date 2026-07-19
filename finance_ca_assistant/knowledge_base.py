@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gc
 import json
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional
@@ -117,6 +118,45 @@ def load_chunks_jsonl(path: str | Path) -> List[Dict[str, object]]:
                 )
             chunks.append(chunk)
     return chunks
+
+
+def find_prebuilt_chunks(
+    search_roots: Iterable[str | Path],
+    exclude: str | Path | None = None,
+) -> Path | None:
+    """Find a deterministic prebuilt ``chunks.jsonl`` under attached inputs."""
+
+    excluded = Path(exclude).resolve() if exclude is not None else None
+    candidates: List[Path] = []
+    for search_root in search_roots:
+        root = Path(search_root)
+        if not root.exists():
+            continue
+        for candidate in root.rglob("chunks.jsonl"):
+            if not candidate.is_file():
+                continue
+            if excluded is not None and candidate.resolve() == excluded:
+                continue
+            candidates.append(candidate)
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda path: (len(path.parts), str(path)))[0]
+
+
+def seed_chunks_cache(source_path: str | Path, target_path: str | Path) -> bool:
+    """Validate and copy a prebuilt chunk artifact into the writable cache."""
+
+    source = Path(source_path)
+    target = Path(target_path)
+    if target.exists() or source.resolve() == target.resolve():
+        return False
+    chunks = load_chunks_jsonl(source)
+    if not chunks:
+        raise ValueError(f"Prebuilt chunk artifact is empty: {source}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+    logger.info("Seeded chunk cache with %s chunks from %s", len(chunks), source)
+    return True
 
 
 def build_chunks_from_pdf_paths(

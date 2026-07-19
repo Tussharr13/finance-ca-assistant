@@ -53,6 +53,11 @@ fallback.
 The Kaggle setup cell installs only missing ingestion packages with `--no-deps`
 so it does not re-resolve or upgrade Kaggle's preinstalled CUDA/RAPIDS stack.
 
+For normal runs, publish `/kaggle/working/finance_ca_assistant_artifacts` from a
+successful saved version as a Kaggle Dataset and attach it to the notebook.
+Section 2 discovers an attached `chunks.jsonl`, copies it into the writable
+cache, and Section 3 returns immediately without downloading or parsing PDFs.
+
 ## Hugging Face Model Stack
 
 The production-oriented local/Kaggle stack is wired as optional providers. In

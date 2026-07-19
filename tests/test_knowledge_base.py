@@ -4,8 +4,10 @@ from finance_ca_assistant.knowledge_base import (
     build_chunks_from_pdf_paths,
     build_knowledge_base_from_sources,
     chunks_from_processed_pdf,
+    find_prebuilt_chunks,
     infer_document_type,
     load_chunks_jsonl,
+    seed_chunks_cache,
     write_chunks_jsonl,
 )
 
@@ -56,6 +58,22 @@ def test_write_chunks_jsonl_round_trips(tmp_path):
     write_chunks_jsonl(chunks, output)
 
     assert load_chunks_jsonl(output) == chunks
+
+
+def test_find_and_seed_prebuilt_chunks(tmp_path):
+    input_root = tmp_path / "input/dataset/artifacts"
+    source = input_root / "chunks.jsonl"
+    chunks = [{"id": "cached", "source": "x.pdf", "page": 1, "text": "Cached"}]
+    write_chunks_jsonl(chunks, source)
+    target = tmp_path / "working/data/processed/chunks.jsonl"
+
+    discovered = find_prebuilt_chunks([tmp_path / "input"], exclude=target)
+    seeded = seed_chunks_cache(discovered, target)
+
+    assert discovered == source
+    assert seeded is True
+    assert load_chunks_jsonl(target) == chunks
+    assert seed_chunks_cache(source, target) is False
 
 
 def test_build_chunks_from_pdf_paths_caps_chunks_per_source(monkeypatch, tmp_path):
