@@ -1,13 +1,16 @@
-from finance_ca_assistant.config import AppConfig
+from finance_ca_assistant.config import AppConfig, SourceDefinition
 from finance_ca_assistant.ingestion.pdf_processor import PageText, ProcessedPDF
 from finance_ca_assistant.knowledge_base import (
     build_chunks_from_pdf_paths,
+    build_chunks_cache_spec,
     build_knowledge_base_from_sources,
     chunks_from_processed_pdf,
     find_prebuilt_chunks,
     infer_document_type,
     load_chunks_jsonl,
     seed_chunks_cache,
+    chunks_cache_manifest_path,
+    write_chunks_cache_manifest,
     write_chunks_jsonl,
 )
 
@@ -65,6 +68,8 @@ def test_find_and_seed_prebuilt_chunks(tmp_path):
     source = input_root / "chunks.jsonl"
     chunks = [{"id": "cached", "source": "x.pdf", "page": 1, "text": "Cached"}]
     write_chunks_jsonl(chunks, source)
+    source_spec = build_chunks_cache_spec([], None, None, "auto")
+    write_chunks_cache_manifest(source, source_spec, len(chunks))
     target = tmp_path / "working/data/processed/chunks.jsonl"
 
     discovered = find_prebuilt_chunks([tmp_path / "input"], exclude=target)
@@ -73,6 +78,7 @@ def test_find_and_seed_prebuilt_chunks(tmp_path):
     assert discovered == source
     assert seeded is True
     assert load_chunks_jsonl(target) == chunks
+    assert chunks_cache_manifest_path(target).exists()
     assert seed_chunks_cache(source, target) is False
 
 
@@ -110,6 +116,16 @@ def test_build_knowledge_base_reuses_cached_chunks_before_download(monkeypatch, 
         chunks_path=tmp_path / "processed/chunks.jsonl",
     )
     write_chunks_jsonl(chunks, config.chunks_path)
+    source = SourceDefinition(
+        source_id="unused",
+        title="Unused",
+        url="https://example.com/unused.pdf",
+        authority="Example",
+        document_type="generic",
+        version="1",
+    )
+    build_spec = build_chunks_cache_spec([source], None, None, "auto")
+    write_chunks_cache_manifest(config.chunks_path, build_spec, len(chunks))
 
     def fail_download(*args, **kwargs):
         raise AssertionError("cached build must not download sources")
@@ -121,7 +137,7 @@ def test_build_knowledge_base_reuses_cached_chunks_before_download(monkeypatch, 
 
     result = build_knowledge_base_from_sources(
         config=config,
-        source_urls={"unused": "https://example.com/unused.pdf"},
+        source_urls={"unused": source},
         rebuild=False,
         build_artifacts=False,
     )
@@ -129,3 +145,48 @@ def test_build_knowledge_base_reuses_cached_chunks_before_download(monkeypatch, 
     assert result.reused_chunks is True
     assert result.chunks == chunks
     assert result.pdf_paths == []
+
+
+def test_build_knowledge_base_rejects_cache_when_limits_change(monkeypatch, tmp_path):
+    chunks = [{"id": "cached", "source": "cached.pdf", "page": 1, "text": "Cached"}]
+    config = AppConfig(
+        data_dir=tmp_path,
+        raw_dir=tmp_path / "raw",
+        processed_dir=tmp_path / "processed",
+        indices_dir=tmp_path / "indices",
+        manifest_path=tmp_path / "manifest.json",
+        clause_index_path=tmp_path / "clause_index.json",
+        chunks_path=tmp_path / "processed/chunks.jsonl",
+    )
+    source = SourceDefinition(
+        source_id="unused",
+        title="Unused",
+        url="https://example.com/unused.pdf",
+        authority="Example",
+        document_type="generic",
+        version="1",
+    )
+    write_chunks_jsonl(chunks, config.chunks_path)
+    original_spec = build_chunks_cache_spec([source], 10, 50, "auto")
+    write_chunks_cache_manifest(config.chunks_path, original_spec, len(chunks))
+    download_attempted = []
+
+    def fail_download(*args, **kwargs):
+        download_attempted.append(True)
+        raise RuntimeError("offline")
+
+    monkeypatch.setattr(
+        "finance_ca_assistant.knowledge_base.PDFDownloader.download",
+        fail_download,
+    )
+    result = build_knowledge_base_from_sources(
+        config=config,
+        source_urls={"unused": source},
+        max_pages_per_pdf=20,
+        max_chunks_per_source=50,
+        rebuild=False,
+        build_artifacts=False,
+    )
+
+    assert result.reused_chunks is False
+    assert download_attempted == [True]

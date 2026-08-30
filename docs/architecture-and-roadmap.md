@@ -281,7 +281,7 @@ when corpus limits, models, or notebook outputs change.
 | Generation | The real LLM is disabled by default, so output is a conservative template rather than a substantive expert answer. |
 | Reranking | The Hugging Face cross-encoder is disabled; the default is a lightweight local keyword reranker. |
 | Persistence | Chunks can be reused, but saved embeddings are not reloaded. Dense, BM25, and clause indexes are rebuilt in memory. |
-| Cache correctness | Chunk artifacts are not fully fingerprinted by source versions and ingestion settings. |
+| Cache correctness | Chunks are fingerprinted by source metadata and ingestion settings, but source updates are not fetched incrementally yet. |
 | Hybrid scoring | Raw dense, BM25, and clause scores are combined without normalization or calibration. |
 | Citations | Retrieved source snippets are attached to the answer, but evidence is not yet verified claim by claim. |
 | Confidence | Confidence is based largely on retrieved chunk count rather than authority, relevance, freshness, and agreement. |
@@ -334,9 +334,11 @@ retrieval artifacts, and can reuse the corpus instead of rebuilding it.
 
 **Status:** Current phase.
 
-- [ ] Define the authoritative source catalogue for each supported domain.
-- [ ] Store publication date, effective date, jurisdiction, authority, and supersession.
-- [ ] Add incremental source updates and cache fingerprints.
+- [x] Define a typed source catalogue for the currently ingested documents.
+- [x] Store jurisdiction and authority, with explicit nullable fields for publication date, effective date, financial year, assessment year, and supersession.
+- [x] Fingerprint chunk caches by source metadata and ingestion settings.
+- [ ] Verify and populate missing legal effective dates from primary sources.
+- [ ] Add incremental source updates instead of rebuilding the selected corpus.
 - [ ] Reload saved embeddings and indexes instead of recomputing them.
 - [ ] Add OCR and table extraction.
 - [ ] Normalize or calibrate hybrid retrieval scores.

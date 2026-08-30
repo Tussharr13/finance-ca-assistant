@@ -6,21 +6,66 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Union
+from typing import Any, Dict, Mapping, Optional, Tuple, Union
 
+
+@dataclass(frozen=True)
+class SourceDefinition:
+    """Versioned metadata for one authoritative knowledge source."""
+
+    source_id: str
+    title: str
+    url: str
+    authority: str
+    document_type: str
+    version: str
+    jurisdiction: str = "India"
+    publication_date: Optional[str] = None
+    effective_from: Optional[str] = None
+    effective_to: Optional[str] = None
+    financial_year: Optional[str] = None
+    assessment_year: Optional[str] = None
+    supersedes: Tuple[str, ...] = ()
+    expected_sha256: Optional[str] = None
+
+
+def _source(
+    source_id: str,
+    title: str,
+    url: str,
+    authority: str,
+    document_type: str,
+    version: str,
+) -> SourceDefinition:
+    return SourceDefinition(
+        source_id=source_id,
+        title=title,
+        url=url,
+        authority=authority,
+        document_type=document_type,
+        version=version,
+    )
+
+
+DEFAULT_SOURCE_CATALOG = {
+    source.source_id: source
+    for source in [
+        _source("CGST_Rules_2017_CBIC", "Central Goods and Services Tax Rules", "https://cbic-gst.gov.in/pdf/cgst-rules-01july2017.pdf", "CBIC", "gst_rules", "2017-source"),
+        _source("ICAI_Tax_Audit_44AB_Guidance_Note_2023", "Guidance Note on Tax Audit under Section 44AB", "https://resource.cdn.icai.org/75812dtc61332.pdf", "ICAI", "form_3cd", "2023"),
+        _source("ICAI_AS_1_Accounting_Policies", "AS 1 Disclosure of Accounting Policies", "https://resource.cdn.icai.org/89095asb-aps2918-as1.pdf", "ICAI", "accounting_standard", "repository-current"),
+        _source("ICAI_AS_2_Inventories", "AS 2 Valuation of Inventories", "https://resource.cdn.icai.org/89096asb-aps2918-as2.pdf", "ICAI", "accounting_standard", "repository-current"),
+        _source("ICAI_AS_9_Revenue_Recognition", "AS 9 Revenue Recognition", "https://resource.cdn.icai.org/89101asb-aps2918-as9.pdf", "ICAI", "accounting_standard", "repository-current"),
+        _source("ICAI_AS_10_PPE", "AS 10 Property, Plant and Equipment", "https://resource.cdn.icai.org/89102asb-aps2918-as10.pdf", "ICAI", "accounting_standard", "repository-current"),
+        _source("ICAI_AS_22_Taxes_on_Income", "AS 22 Accounting for Taxes on Income", "https://resource.cdn.icai.org/89115asb-aps2918-as22.pdf", "ICAI", "accounting_standard", "repository-current"),
+        _source("ICAI_AS_29_Provisions_Contingencies", "AS 29 Provisions, Contingent Liabilities and Contingent Assets", "https://resource.cdn.icai.org/89123asb-aps2918-as29.pdf", "ICAI", "accounting_standard", "repository-current"),
+        _source("ICAI_Ind_AS_Overview_Revised_2023", "Indian Accounting Standards Overview", "https://resource.cdn.icai.org/75317asb60889.pdf", "ICAI", "accounting_standard", "2023"),
+        _source("ICAI_SA_200_Overall_Objectives", "SA 200 Overall Objectives of the Independent Auditor", "https://resource.cdn.icai.org/18132sa200_rev.pdf", "ICAI", "audit_standard", "revised"),
+        _source("ICAI_SA_500_Audit_Evidence", "SA 500 Audit Evidence", "https://resource.cdn.icai.org/15576sa500revised.pdf", "ICAI", "audit_standard", "revised"),
+    ]
+}
 
 DEFAULT_SOURCE_URLS = {
-    "CGST_Rules_2017_CBIC": "https://cbic-gst.gov.in/pdf/cgst-rules-01july2017.pdf",
-    "ICAI_Tax_Audit_44AB_Guidance_Note_2023": "https://resource.cdn.icai.org/75812dtc61332.pdf",
-    "ICAI_AS_1_Accounting_Policies": "https://resource.cdn.icai.org/89095asb-aps2918-as1.pdf",
-    "ICAI_AS_2_Inventories": "https://resource.cdn.icai.org/89096asb-aps2918-as2.pdf",
-    "ICAI_AS_9_Revenue_Recognition": "https://resource.cdn.icai.org/89101asb-aps2918-as9.pdf",
-    "ICAI_AS_10_PPE": "https://resource.cdn.icai.org/89102asb-aps2918-as10.pdf",
-    "ICAI_AS_22_Taxes_on_Income": "https://resource.cdn.icai.org/89115asb-aps2918-as22.pdf",
-    "ICAI_AS_29_Provisions_Contingencies": "https://resource.cdn.icai.org/89123asb-aps2918-as29.pdf",
-    "ICAI_Ind_AS_Overview_Revised_2023": "https://resource.cdn.icai.org/75317asb60889.pdf",
-    "ICAI_SA_200_Overall_Objectives": "https://resource.cdn.icai.org/18132sa200_rev.pdf",
-    "ICAI_SA_500_Audit_Evidence": "https://resource.cdn.icai.org/15576sa500revised.pdf",
+    source_id: source.url for source_id, source in DEFAULT_SOURCE_CATALOG.items()
 }
 
 SMOKE_SOURCE_URLS = {

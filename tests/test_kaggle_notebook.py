@@ -49,6 +49,7 @@ def test_kaggle_section_3_reuses_cache_and_has_safe_limits():
     assert 'PDF_BACKEND = "pymupdf"' in section_source
     assert "REBUILD_KB = False" in section_source
     assert "build_artifacts=False" in section_source
+    assert "DEFAULT_SOURCE_CATALOG" in section_source
 
 
 def test_kaggle_section_2_seeds_attached_prebuilt_chunks():
@@ -59,6 +60,15 @@ def test_kaggle_section_2_seeds_attached_prebuilt_chunks():
     assert "find_prebuilt_chunks" in section_source
     assert "Path('/kaggle/input')" in section_source
     assert "seed_chunks_cache" in section_source
+
+
+def test_kaggle_section_6_publishes_chunk_manifest():
+    section_source = "\n".join(
+        "".join(cell.get("source", [])) for cell in _load_notebook_cells()
+    )
+
+    assert "result.cache_manifest_path" in section_source
+    assert "chunks.manifest.json" in section_source
 
 
 def test_kaggle_section_4_is_staged_and_safe_by_default():

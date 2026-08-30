@@ -7,7 +7,7 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Mapping, Optional
 
 from finance_ca_assistant.logger import get_logger
 
@@ -26,6 +26,16 @@ class SourceRecord:
     size_bytes: int
     registered_at: str
     changed: bool
+    title: Optional[str] = None
+    url: Optional[str] = None
+    authority: Optional[str] = None
+    document_type: Optional[str] = None
+    jurisdiction: Optional[str] = None
+    publication_date: Optional[str] = None
+    effective_from: Optional[str] = None
+    effective_to: Optional[str] = None
+    financial_year: Optional[str] = None
+    assessment_year: Optional[str] = None
 
 
 class SourceRegistry:
@@ -55,6 +65,7 @@ class SourceRegistry:
         path: str | Path,
         version: str = "latest",
         expected_sha256: Optional[str] = None,
+        metadata: Optional[Mapping[str, object]] = None,
     ) -> SourceRecord:
         """Register a file, validate its optional hash, and return change status."""
 
@@ -71,6 +82,7 @@ class SourceRegistry:
         manifest = self.load()
         previous = manifest.get(source_id)
         changed = previous is None or previous.get("sha256") != sha256
+        source_metadata = dict(metadata or {})
         record = SourceRecord(
             source_id=source_id,
             path=str(file_path),
@@ -79,11 +91,25 @@ class SourceRegistry:
             size_bytes=file_path.stat().st_size,
             registered_at=datetime.now(timezone.utc).isoformat(),
             changed=changed,
+            title=_optional_string(source_metadata.get("title")),
+            url=_optional_string(source_metadata.get("url")),
+            authority=_optional_string(source_metadata.get("authority")),
+            document_type=_optional_string(source_metadata.get("document_type")),
+            jurisdiction=_optional_string(source_metadata.get("jurisdiction")),
+            publication_date=_optional_string(source_metadata.get("publication_date")),
+            effective_from=_optional_string(source_metadata.get("effective_from")),
+            effective_to=_optional_string(source_metadata.get("effective_to")),
+            financial_year=_optional_string(source_metadata.get("financial_year")),
+            assessment_year=_optional_string(source_metadata.get("assessment_year")),
         )
         manifest[source_id] = asdict(record)
         self.save(manifest)
         logger.info("Registered source %s changed=%s", source_id, changed)
         return record
+
+
+def _optional_string(value: object) -> Optional[str]:
+    return None if value is None else str(value)
 
 
 def compute_sha256(path: str | Path) -> str:
@@ -94,4 +120,3 @@ def compute_sha256(path: str | Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
-

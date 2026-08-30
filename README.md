@@ -67,8 +67,11 @@ so it does not re-resolve or upgrade Kaggle's preinstalled CUDA/RAPIDS stack.
 
 For normal runs, publish `/kaggle/working/finance_ca_assistant_artifacts` from a
 successful saved version as a Kaggle Dataset and attach it to the notebook.
-Section 2 discovers an attached `chunks.jsonl`, copies it into the writable
-cache, and Section 3 returns immediately without downloading or parsing PDFs.
+Section 2 discovers an attached `chunks.jsonl` and its
+`chunks.manifest.json`, then copies both into the writable cache. Section 3
+returns immediately only when the source catalogue and ingestion settings
+match the manifest fingerprint. Legacy artifacts without a manifest rebuild
+once instead of being trusted silently.
 
 ## Hugging Face Model Stack
 

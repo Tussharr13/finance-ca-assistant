@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 import gc
+import hashlib
 import json
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional
 
-from finance_ca_assistant.config import AppConfig, DEFAULT_SOURCE_URLS, ensure_directories, load_config
+from finance_ca_assistant.config import (
+    AppConfig,
+    DEFAULT_SOURCE_CATALOG,
+    SourceDefinition,
+    ensure_directories,
+    load_config,
+)
 from finance_ca_assistant.ingestion.pdf_downloader import PDFDownloader
 from finance_ca_assistant.ingestion.pdf_processor import PDFProcessor, ProcessedPDF, format_process_rss
 from finance_ca_assistant.ingestion.source_registry import SourceRegistry
@@ -21,6 +28,8 @@ from finance_ca_assistant.utils.pdf_utils import safe_pdf_name
 
 
 logger = get_logger(__name__)
+CACHE_SCHEMA_VERSION = 1
+CHUNKER_SETTINGS = {"max_chars": 1200, "overlap": 150}
 
 
 @dataclass(frozen=True)
@@ -33,6 +42,109 @@ class KnowledgeBaseBuildResult:
     failed_pdfs: List[Dict[str, str]] = field(default_factory=list)
     artifact_paths: Dict[str, str] = field(default_factory=dict)
     reused_chunks: bool = False
+    cache_manifest_path: str = ""
+
+
+def chunks_cache_manifest_path(chunks_path: str | Path) -> Path:
+    """Return the sidecar manifest path for a chunk cache."""
+
+    return Path(chunks_path).with_name("chunks.manifest.json")
+
+
+def _normalize_sources(
+    sources: Mapping[str, str | SourceDefinition],
+) -> List[SourceDefinition]:
+    normalized: List[SourceDefinition] = []
+    for source_id, source in sources.items():
+        if isinstance(source, SourceDefinition):
+            if source.source_id != source_id:
+                raise ValueError(f"Source key {source_id!r} does not match {source.source_id!r}")
+            normalized.append(source)
+        else:
+            normalized.append(
+                SourceDefinition(
+                    source_id=source_id,
+                    title=source_id,
+                    url=str(source),
+                    authority="unknown",
+                    document_type=infer_document_type(source_id),
+                    version="unversioned",
+                )
+            )
+    return normalized
+
+
+def build_chunks_cache_spec(
+    sources: Iterable[SourceDefinition],
+    max_pages_per_pdf: Optional[int],
+    max_chunks_per_source: Optional[int],
+    pdf_backend: str,
+) -> Dict[str, object]:
+    """Build the canonical set of inputs that determine chunk-cache validity."""
+
+    return {
+        "schema_version": CACHE_SCHEMA_VERSION,
+        "sources": [asdict(source) for source in sources],
+        "max_pages_per_pdf": max_pages_per_pdf,
+        "max_chunks_per_source": max_chunks_per_source,
+        "pdf_backend": pdf_backend,
+        "chunker": CHUNKER_SETTINGS,
+    }
+
+
+def _fingerprint(value: Mapping[str, object]) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def write_chunks_cache_manifest(
+    chunks_path: str | Path,
+    build_spec: Mapping[str, object],
+    chunk_count: int,
+) -> str:
+    """Write a fingerprinted sidecar for a completed chunk cache."""
+
+    cache_path = Path(chunks_path)
+    manifest_path = chunks_cache_manifest_path(cache_path)
+    manifest = {
+        "schema_version": CACHE_SCHEMA_VERSION,
+        "fingerprint": _fingerprint(build_spec),
+        "build_spec": dict(build_spec),
+        "chunk_count": chunk_count,
+        "chunks_sha256": _file_sha256(cache_path),
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    return str(manifest_path)
+
+
+def _load_valid_cached_chunks(
+    chunks_path: Path,
+    build_spec: Mapping[str, object],
+) -> Optional[List[Dict[str, object]]]:
+    manifest_path = chunks_cache_manifest_path(chunks_path)
+    if not chunks_path.exists() or not manifest_path.exists():
+        return None
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("fingerprint") != _fingerprint(build_spec):
+            return None
+        if manifest.get("chunks_sha256") != _file_sha256(chunks_path):
+            return None
+        chunks = load_chunks_jsonl(chunks_path)
+        if manifest.get("chunk_count") != len(chunks):
+            return None
+        return chunks
+    except (OSError, ValueError, json.JSONDecodeError):
+        logger.warning("Invalid chunk-cache manifest at %s; rebuilding", manifest_path)
+        return None
 
 
 def infer_document_type(source_name: str) -> str:
@@ -155,6 +267,9 @@ def seed_chunks_cache(source_path: str | Path, target_path: str | Path) -> bool:
         raise ValueError(f"Prebuilt chunk artifact is empty: {source}")
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, target)
+    source_manifest = chunks_cache_manifest_path(source)
+    if source_manifest.exists():
+        shutil.copyfile(source_manifest, chunks_cache_manifest_path(target))
     logger.info("Seeded chunk cache with %s chunks from %s", len(chunks), source)
     return True
 
@@ -202,7 +317,7 @@ def build_chunks_from_pdf_paths(
 
 def build_knowledge_base_from_sources(
     config: Optional[AppConfig] = None,
-    source_urls: Optional[Mapping[str, str]] = None,
+    source_urls: Optional[Mapping[str, str | SourceDefinition]] = None,
     limit: Optional[int] = None,
     max_pages_per_pdf: Optional[int] = None,
     max_chunks_per_source: Optional[int] = None,
@@ -221,9 +336,19 @@ def build_knowledge_base_from_sources(
     selected_config = config or load_config()
     ensure_directories(selected_config)
 
-    if not rebuild and selected_config.chunks_path.exists():
-        cached_chunks = load_chunks_jsonl(selected_config.chunks_path)
-        if cached_chunks:
+    selected_sources = _normalize_sources(source_urls or DEFAULT_SOURCE_CATALOG)
+    if limit is not None:
+        selected_sources = selected_sources[:limit]
+    build_spec = build_chunks_cache_spec(
+        selected_sources,
+        max_pages_per_pdf,
+        max_chunks_per_source,
+        pdf_backend,
+    )
+
+    if not rebuild:
+        cached_chunks = _load_valid_cached_chunks(selected_config.chunks_path, build_spec)
+        if cached_chunks is not None:
             logger.info(
                 "Reusing %s cached chunks from %s",
                 len(cached_chunks),
@@ -233,32 +358,38 @@ def build_knowledge_base_from_sources(
                 pdf_paths=[],
                 chunks=cached_chunks,
                 reused_chunks=True,
+                cache_manifest_path=str(chunks_cache_manifest_path(selected_config.chunks_path)),
             )
-        logger.warning("Chunk cache is empty; rebuilding %s", selected_config.chunks_path)
-
-    selected_sources = list((source_urls or DEFAULT_SOURCE_URLS).items())
-    if limit is not None:
-        selected_sources = selected_sources[:limit]
+        logger.info("Chunk cache missing or stale; rebuilding %s", selected_config.chunks_path)
 
     downloader = PDFDownloader(selected_config.raw_dir)
     registry = SourceRegistry(selected_config.manifest_path)
     pdf_paths: List[str] = []
     failed_sources: List[Dict[str, str]] = []
 
-    for source_id, url in selected_sources:
+    for source in selected_sources:
         try:
             result = downloader.download(
-                url,
-                target_name=safe_pdf_name(source_id),
+                source.url,
+                target_name=safe_pdf_name(source.source_id),
                 use_cache_on_failure=True,
                 prefer_cache=not rebuild,
             )
-            registry.register_source(source_id, result.path)
+            source_metadata = asdict(source)
+            registry.register_source(
+                source.source_id,
+                result.path,
+                version=source.version,
+                expected_sha256=source.expected_sha256,
+                metadata=source_metadata,
+            )
             pdf_paths.append(str(result.path))
-            logger.info("Ready source %s -> %s", source_id, result.path)
+            logger.info("Ready source %s -> %s", source.source_id, result.path)
         except Exception as error:
-            logger.warning("Failed source %s: %s", source_id, error)
-            failed_sources.append({"source_id": source_id, "url": url, "error": str(error)})
+            logger.warning("Failed source %s: %s", source.source_id, error)
+            failed_sources.append(
+                {"source_id": source.source_id, "url": source.url, "error": str(error)}
+            )
 
     chunks, failed_pdfs = build_chunks_from_pdf_paths(
         pdf_paths,
@@ -267,6 +398,11 @@ def build_knowledge_base_from_sources(
         pdf_backend=pdf_backend,
     )
     write_chunks_jsonl(chunks, selected_config.chunks_path)
+    cache_manifest_path = write_chunks_cache_manifest(
+        selected_config.chunks_path,
+        build_spec,
+        len(chunks),
+    )
     artifact_paths: Dict[str, str] = {}
     if chunks and build_artifacts:
         pipeline = RAGPipeline.from_chunks(chunks)
@@ -278,4 +414,5 @@ def build_knowledge_base_from_sources(
         failed_sources=failed_sources,
         failed_pdfs=failed_pdfs,
         artifact_paths=artifact_paths,
+        cache_manifest_path=cache_manifest_path,
     )
