@@ -280,7 +280,7 @@ when corpus limits, models, or notebook outputs change.
 | Knowledge coverage | The bounded corpus is too narrow for the intended product. It does not contain sufficient evidence for the salary-tax demonstration. |
 | Generation | The real LLM is disabled by default, so output is a conservative template rather than a substantive expert answer. |
 | Reranking | The Hugging Face cross-encoder is disabled; the default is a lightweight local keyword reranker. |
-| Persistence | Chunks can be reused, but saved embeddings are not reloaded. Dense, BM25, and clause indexes are rebuilt in memory. |
+| Persistence | Saved embeddings and clause mappings can be reloaded; the lightweight BM25 index is still rebuilt in memory. |
 | Cache correctness | Chunks are fingerprinted by source metadata and ingestion settings, but source updates are not fetched incrementally yet. |
 | Hybrid scoring | Raw dense, BM25, and clause scores are combined without normalization or calibration. |
 | Citations | Retrieved source snippets are attached to the answer, but evidence is not yet verified claim by claim. |
@@ -339,7 +339,8 @@ retrieval artifacts, and can reuse the corpus instead of rebuilding it.
 - [x] Fingerprint chunk caches by source metadata and ingestion settings.
 - [ ] Verify and populate missing legal effective dates from primary sources.
 - [ ] Add incremental source updates instead of rebuilding the selected corpus.
-- [ ] Reload saved embeddings and indexes instead of recomputing them.
+- [x] Reload saved embeddings and clause mappings instead of recomputing dense vectors.
+- [ ] Persist and reload the BM25 index.
 - [ ] Add OCR and table extraction.
 - [ ] Normalize or calibrate hybrid retrieval scores.
 - [ ] Integrate claim-level citation validation.

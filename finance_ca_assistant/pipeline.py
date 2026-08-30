@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
 from finance_ca_assistant.embeddings.embedding_cache import EmbeddingCache
+from finance_ca_assistant.embeddings.embedding_validator import validate_embedding_matrix
 from finance_ca_assistant.embeddings.embedding_factory import (
     EmbeddingProvider,
     create_embedding_provider,
@@ -101,6 +102,78 @@ class RAGPipeline:
             if line.strip()
         ]
         return cls.from_chunks(chunks)
+
+    @classmethod
+    def from_artifacts(
+        cls,
+        artifacts_dir: str | Path,
+        embedding_provider: EmbeddingProvider | None = None,
+        reranker: object | None = None,
+        llm: LLMClient | None = None,
+    ) -> "RAGPipeline":
+        """Load saved chunks and embeddings without re-embedding the corpus.
+
+        The embedding provider is still needed to embed each future query. The
+        document matrix is loaded from disk and must have the same model,
+        dimensions, row count, and chunk IDs as the saved metadata.
+        """
+
+        root = Path(artifacts_dir)
+        cache = EmbeddingCache(root / "embeddings_cache.npz").load()
+        if not cache.metadata:
+            raise ValueError("Embedding cache contains no chunk metadata")
+        validation = validate_embedding_matrix(cache.embeddings, len(cache.metadata))
+        if not validation.valid:
+            raise ValueError(f"Invalid embedding cache: {validation.reason}")
+
+        metadata_builder = MetadataBuilder()
+        chunks = [metadata_builder.enrich_chunk(dict(chunk)) for chunk in cache.metadata]
+        chunk_ids = [str(chunk.get("id") or "") for chunk in chunks]
+        if not all(chunk_ids) or len(set(chunk_ids)) != len(chunk_ids):
+            raise ValueError("Embedding cache metadata must contain unique chunk IDs")
+
+        provider = embedding_provider
+        if provider is None:
+            if cache.model_name != "hash-local":
+                raise ValueError(
+                    "embedding_provider is required when loading non-local embeddings"
+                )
+            provider = create_embedding_provider(
+                "hash-local", dimensions=int(cache.embeddings.shape[1])
+            )
+        if provider.model_name != cache.model_name:
+            raise ValueError(
+                f"Embedding model mismatch: cache={cache.model_name}, provider={provider.model_name}"
+            )
+        if int(getattr(provider, "dimensions", cache.embeddings.shape[1])) != int(
+            cache.embeddings.shape[1]
+        ):
+            raise ValueError("Embedding provider dimensions do not match the saved matrix")
+
+        vector_store = InMemoryVectorStore()
+        vector_store.add(cache.embeddings, chunks)
+        bm25_index = BM25Index()
+        bm25_index.add(chunks)
+        clause_index_path = root / "clause_index.json"
+        if clause_index_path.exists():
+            clause_index = json.loads(clause_index_path.read_text(encoding="utf-8"))
+            clause_searcher = ClauseSearcher.from_index(chunks, clause_index)
+        else:
+            clause_searcher = ClauseSearcher.from_chunks(chunks)
+        retriever = HybridRetriever(
+            vector_store=vector_store,
+            bm25_index=bm25_index,
+            clause_searcher=clause_searcher,
+            query_embedder=provider.embed_query,
+            reranker=reranker,
+        )
+        return cls(
+            chunks=chunks,
+            embedding_provider=provider,
+            embeddings=cache.embeddings,
+            retriever=retriever,
+            answer_generator=CAAnswerGenerator(llm=llm),
+        )
 
     def answer(self, question: str, top_k: int = 6) -> PipelineResponse:
         """Retrieve relevant chunks and generate a structured CA answer."""

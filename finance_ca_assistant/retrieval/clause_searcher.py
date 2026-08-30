@@ -32,6 +32,25 @@ class ClauseSearcher:
                 mapping.setdefault(reference.normalized, []).append(dict(chunk))
         return cls(mapping)
 
+    @classmethod
+    def from_index(
+        cls,
+        chunks: List[Dict[str, Any]],
+        index: Dict[str, Dict[str, object]],
+    ) -> "ClauseSearcher":
+        """Load a saved reference index and resolve IDs to current chunks."""
+
+        chunks_by_id = {str(chunk.get("id")): chunk for chunk in chunks}
+        mapping: Dict[str, List[Dict[str, Any]]] = {}
+        for reference, entry in index.items():
+            chunk_ids = entry.get("chunks", []) if isinstance(entry, dict) else []
+            mapping[reference] = [
+                dict(chunks_by_id[str(chunk_id)])
+                for chunk_id in chunk_ids
+                if str(chunk_id) in chunks_by_id
+            ]
+        return cls(mapping)
+
     def search(self, query: str, top_k: int = 10) -> List[ClauseSearchResult]:
         results: List[ClauseSearchResult] = []
         seen = set()
@@ -43,4 +62,3 @@ class ClauseSearcher:
                 seen.add(chunk_id)
                 results.append(ClauseSearchResult(chunk=chunk))
         return results[:top_k]
-

@@ -42,3 +42,19 @@ def test_pipeline_saves_artifacts(tmp_path, sample_chunks):
     assert Path(paths["embeddings"]).exists()
     assert Path(paths["clause_index"]).exists()
 
+
+def test_pipeline_loads_artifacts_without_reembedding(tmp_path, sample_chunks, monkeypatch):
+    original = RAGPipeline.from_chunks(sample_chunks)
+    original.save_artifacts(tmp_path)
+
+    def fail_embed(*args, **kwargs):
+        raise AssertionError("loading artifacts must not re-embed document chunks")
+
+    monkeypatch.setattr(original.embedding_provider, "embed_texts", fail_embed)
+    loaded = RAGPipeline.from_artifacts(
+        tmp_path,
+        embedding_provider=original.embedding_provider,
+    )
+
+    assert loaded.embeddings.shape == original.embeddings.shape
+    assert loaded.retriever.clause_searcher.search("Form 3CD clause 44", top_k=1)[0].chunk["id"] == "tax-44"

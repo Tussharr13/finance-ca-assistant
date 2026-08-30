@@ -60,6 +60,7 @@ def test_kaggle_section_2_seeds_attached_prebuilt_chunks():
     assert "find_prebuilt_chunks" in section_source
     assert "Path('/kaggle/input')" in section_source
     assert "seed_chunks_cache" in section_source
+    assert "embeddings_cache.npz" in section_source
 
 
 def test_kaggle_section_6_publishes_chunk_manifest():
@@ -97,6 +98,7 @@ def test_kaggle_section_4_is_staged_and_safe_by_default():
     assert "BAAI/bge-small-en-v1.5" in section_source
     assert "Qwen/Qwen3-0.6B" in section_source
     assert "load_optional_provider" in section_source
+    assert "RAGPipeline.from_artifacts" in section_source
 
     for offset, cell in enumerate(section_cells):
         if cell["cell_type"] == "code":
