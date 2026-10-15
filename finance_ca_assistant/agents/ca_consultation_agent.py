@@ -8,6 +8,14 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from finance_ca_assistant.calculators import RegimeComparison, SalaryTaxInput, UnsupportedTaxYear, compare_regimes
 from finance_ca_assistant.calculators.tax_rules import RULES_BY_YEAR
+from finance_ca_assistant.generation.llm_factory import EchoLLM
+from finance_ca_assistant.generation.typed_claims import (
+    CLAIMS_SYSTEM_PROMPT,
+    build_claims_prompt,
+    build_salary_evidence,
+    render_claims,
+    validate_claims,
+)
 from finance_ca_assistant.retrieval.result_formatter import format_retrieval_results
 
 # Used when the client does not name a year. Planning for a later year must
@@ -80,6 +88,8 @@ class AgentResponse:
     retrieved_sources: str = ""
     answer: Optional[Dict[str, Any]] = None
     calculation: Optional[RegimeComparison] = None
+    # Typed-claims explanation diagnostics: accepted/rejected claims or an error.
+    explanation: Optional[Dict[str, Any]] = None
 
 
 class CAConsultationAgent:
@@ -87,8 +97,10 @@ class CAConsultationAgent:
 
     The agent first gathers client facts. For salary tax planning it then runs
     the deterministic regime calculator and builds the reply from its output,
-    so every figure comes from code and cites the provision behind it. No
-    client facts are sent to retrieval or to an LLM in that flow.
+    so every figure comes from code and cites the provision behind it. Client
+    facts never go into retrieval. When a real LLM is configured, it receives
+    the facts and the calculation to write a typed-claims explanation; this is
+    only acceptable for self-hosted models until redaction exists (D-23).
     """
 
     def __init__(self, pipeline: Any) -> None:
@@ -170,13 +182,47 @@ class CAConsultationAgent:
                 profile_updates=profile_updates,
                 retrieved_sources=retrieved_sources,
             )
+        message = _build_calculation_message(comparison, assumptions, profile)
+        explanation = self._explain_calculation(user_message, profile, comparison, [r.chunk for r in retrieved])
+        if explanation and explanation["accepted"]:
+            message = f"Why this result:\n{explanation['rendered']}\n\n{message}"
         return AgentResponse(
             status="calculated",
-            message=_build_calculation_message(comparison, assumptions, profile),
+            message=message,
             profile_updates=profile_updates,
             retrieved_sources=retrieved_sources,
             calculation=comparison,
+            explanation=explanation,
         )
+
+    def _explain_calculation(
+        self,
+        user_message: str,
+        profile: ClientProfile,
+        comparison: RegimeComparison,
+        chunks: Sequence[Mapping[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        """Ask the LLM to explain the result as typed claims; keep only verified ones.
+
+        The calculator table is always shown, so any failure here only removes
+        the explanation. Returns None when no real LLM is configured.
+        """
+
+        llm = getattr(getattr(self.pipeline, "answer_generator", None), "llm", None)
+        if llm is None or isinstance(llm, EchoLLM):
+            return None
+        evidence = build_salary_evidence(profile.as_dict(), comparison, chunks)
+        try:
+            raw = llm.generate(CLAIMS_SYSTEM_PROMPT, build_claims_prompt(user_message, evidence), max_tokens=700)
+        except Exception as error:  # A model failure must not lose the calculation.
+            return {"accepted": [], "rejected": [], "error": f"generation_failed:{type(error).__name__}", "rendered": ""}
+        result = validate_claims(raw, evidence, lower_regime=comparison.lower_regime)
+        return {
+            "accepted": result.accepted,
+            "rejected": result.rejected,
+            "error": result.error,
+            "rendered": render_claims(result.accepted, evidence),
+        }
 
 
 def _classify_topic(message: str) -> str:

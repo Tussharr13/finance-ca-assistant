@@ -16,12 +16,12 @@ decision is reversed, add a new entry and mark the old one **Superseded by D-xx*
 | [D-01](#d-01-kaggle-is-the-runtime-the-repo-is-the-source-of-truth) | 2026-07-07 | Kaggle is the runtime, the repo is the source of truth | Accepted |
 | [D-02](#d-02-hugging-face-first-model-stack) | 2026-07-07 | Hugging Face-first model stack | Accepted |
 | [D-03](#d-03-bounded-cached-corpus-builds-on-kaggle) | 2026-07-12 | Bounded, cached corpus builds on Kaggle | Accepted |
-| [D-04](#d-04-answers-are-exact-extracts-or-abstain) | 2026-10-16 | Answers are exact extracts or abstain | Accepted, to be superseded by D-09 |
+| [D-04](#d-04-answers-are-exact-extracts-or-abstain) | 2026-10-16 | Answers are exact extracts or abstain | Accepted for general questions; consultations use D-23 |
 | [D-05](#d-05-weighted-reciprocal-rank-fusion-for-hybrid-search) | 2026-10-16 | Weighted reciprocal rank fusion for hybrid search | Accepted |
 | [D-06](#d-06-metadata-filters-apply-before-candidate-limits) | 2026-10-16 | Metadata filters apply before candidate limits | Accepted |
 | [D-07](#d-07-rule-based-client-fact-parsing-for-now) | 2026-10-16 | Rule-based client fact parsing, for now | Accepted |
 | [D-08](#d-08-normalise-units-at-parse-time) | 2026-10-16 | Normalise money units at parse time | Accepted |
-| [D-09](#d-09-typed-claims-answer-contract) | 2026-10-16 | Typed-claims answer contract | Proposed |
+| [D-09](#d-09-typed-claims-answer-contract) | 2026-10-16 | Typed-claims answer contract | Accepted for consultations (D-23) |
 | [D-10](#d-10-target-architecture-for-web-and-mobile) | 2026-10-16 | Target architecture for web and mobile | Proposed |
 | [D-11](#d-11-tax-numbers-come-from-deterministic-calculators) | 2026-10-16 | Tax numbers come from deterministic calculators | Accepted |
 | [D-12](#d-12-tax-rules-are-effective-dated-data-only-verified-years-run) | 2026-10-16 | Tax rules are effective-dated data; only verified years run | Accepted |
@@ -35,6 +35,8 @@ decision is reversed, add a new entry and mark the old one **Superseded by D-xx*
 | [D-20](#d-20-default-to-the-latest-verified-tax-year-and-say-so) | 2026-10-16 | Default to the latest verified tax year, and say so | Accepted |
 | [D-21](#d-21-calculation-ids-hash-canonical-figures) | 2026-10-16 | Calculation IDs hash canonical figures | Accepted |
 | [D-22](#d-22-follow-up-answers-continue-the-consultation) | 2026-10-16 | Follow-up answers continue the consultation | Accepted |
+| [D-23](#d-23-typed-claims-explain-the-calculation-never-replace-it) | 2026-10-16 | Typed claims explain the calculation, never replace it | Accepted |
+| [D-24](#d-24-numbers-in-claims-must-match-cited-evidence) | 2026-10-16 | Numbers in claims must match cited evidence | Accepted |
 
 ---
 
@@ -519,3 +521,67 @@ that both adds facts and asks something unrelated stays in the tax flow.
 
 **Revisit when.** The D-10 orchestrator keeps explicit conversation state
 (current workflow) instead of inferring it.
+
+---
+
+## D-23 Typed claims explain the calculation, never replace it
+
+**Date:** 2026-10-16 · **Status:** Accepted · **Implements:** D-09 for salary consultations
+
+**Context.** D-18 gave correct figures but no explanation of *why* a regime wins.
+D-09 defined how an LLM could explain safely.
+
+**Decision.**
+- Evidence is a flat list with IDs: `fact:<profile field>`, `calc:<regime>.<figure>`,
+  `calc:<regime>.step<n>` (each with its provision), `calc:saving`, and
+  `chunk:<id>` for retrieved passages.
+- The LLM returns 3 to 6 claims typed `fact`, `calculation`, `rule` or
+  `recommendation`, each with the evidence IDs it uses.
+- Each claim is checked independently: IDs exist; the type cites the right kinds
+  (fact → only facts; calculation → at least one calc; rule → only chunks;
+  recommendation → a fact plus a calc or chunk); every number matches (D-24);
+  a recommendation may not favour the regime that costs more.
+- Invalid claims are dropped one by one, not the whole answer (unlike D-04),
+  because the calculator table is always shown and stays the authority.
+- Model errors or malformed output remove only the explanation. With the offline
+  `EchoLLM`, no explanation is attempted.
+
+**Why.** The model contributes language; code guarantees the substance. Dropping
+single claims is safe here because nothing the client needs depends on them.
+
+**Implemented.** `generation/typed_claims.py`; `_explain_calculation` in the
+consultation agent; `AgentResponse.explanation` carries accepted and rejected
+claims with reasons; a notebook cell in Section 5 shows the acceptance rate.
+
+**Trade-offs.**
+- **Personal data now reaches the LLM.** This reverses part of D-18. Acceptable
+  only while the model is self-hosted (Qwen on Kaggle). Redaction or a self-hosted
+  gateway (D-10) is required before any hosted model is used.
+- The contradiction check is a keyword heuristic ("old regime" vs "new regime").
+- Numbers written in words ("seventy thousand") are not checked.
+- Claims are verified for support, not for relevance or completeness.
+- Acceptance rate with real Qwen models is unmeasured; Qwen3-0.6B will likely
+  fail often, so use Qwen3-4B for this.
+
+**Revisit when.** Kaggle runs show the acceptance rate; general questions move from
+D-04 to typed claims with `rule` claims over retrieved chunks.
+
+---
+
+## D-24 Numbers in claims must match cited evidence
+
+**Date:** 2026-10-16 · **Status:** Accepted
+
+**Decision.** Every standalone number in a claim must equal a value in the
+evidence it cites. Section, rule, clause and form numbers, tax years and
+calculation IDs are ignored. Rounding is allowed to the precision written
+("₹0.72 lakh" matches 72,280) but never by more than 5% of the value. Monthly
+profile amounts may be stated per year. Numbers in `rule` claims must appear in
+the cited passage. Percentages count as numbers, so the model cannot state slab
+rates that are not in the evidence.
+
+**Why.** A tax explanation is only as trustworthy as its figures; matching is a
+check code can do exactly.
+
+**Trade-offs.** Strict: a correct but uncited figure (for example a slab rate) is
+rejected. Adding rates as evidence would allow them.
