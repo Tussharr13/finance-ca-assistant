@@ -30,6 +30,11 @@ decision is reversed, add a new entry and mark the old one **Superseded by D-xx*
 | [D-15](#d-15-a-fine-tuned-model-must-earn-adoption) | 2026-10-16 | A fine-tuned model must earn adoption | Accepted |
 | [D-16](#d-16-strip-qwen3-reasoning-from-all-llm-output) | 2026-10-16 | Strip Qwen3 reasoning from all LLM output | Accepted |
 | [D-17](#d-17-commit-small-push-to-main-so-kaggle-can-pull) | 2026-10-16 | Commit small, push to main so Kaggle can pull | Accepted |
+| [D-18](#d-18-salary-consultation-answers-with-the-calculator-not-the-llm) | 2026-10-16 | Salary consultation answers with the calculator, not the LLM | Accepted |
+| [D-19](#d-19-ask-only-for-facts-the-calculation-needs) | 2026-10-16 | Ask only for facts the calculation needs | Accepted |
+| [D-20](#d-20-default-to-the-latest-verified-tax-year-and-say-so) | 2026-10-16 | Default to the latest verified tax year, and say so | Accepted |
+| [D-21](#d-21-calculation-ids-hash-canonical-figures) | 2026-10-16 | Calculation IDs hash canonical figures | Accepted |
+| [D-22](#d-22-follow-up-answers-continue-the-consultation) | 2026-10-16 | Follow-up answers continue the consultation | Accepted |
 
 ---
 
@@ -284,7 +289,7 @@ contribution cap. Rates were written from knowledge and **have not been checked
 against the Finance Act 2025 text**.
 
 **Revisit when.** Before any user relies on it: verify the rates with a CA.
-Next: connect it to the consultation (needs basic salary and actual 80C/80D amounts).
+Connected to the consultation in D-18.
 
 ---
 
@@ -404,3 +409,113 @@ straight to `main`.
 on demand instead.
 
 **Revisit when.** A second contributor joins, or the backend is deployed for users.
+
+---
+
+## D-18 Salary consultation answers with the calculator, not the LLM
+
+**Date:** 2026-10-16 · **Status:** Accepted · **Commit:** see git log "Answer salary consultations with the regime calculator"
+
+**Context.** Once all facts were gathered, the consultation sent the whole client
+profile (salary, age, rent) into retrieval and the LLM, and the D-04 contract
+then abstained, so clients never got an answer.
+
+**Decision.** When the facts are complete, the agent maps the profile to
+`SalaryTaxInput`, runs `compare_regimes`, and builds the reply in code: a
+side-by-side table, the deductions applied with their provisions, every
+assumption made, what the calculator does not include, the evidence to keep,
+and a CA-confirmation line. Status is `calculated`; the full result is on
+`AgentResponse.calculation`. Retrieval uses a fixed query with no client facts.
+
+**Why.** Every figure is reproducible and cites its provision; no personal data
+goes to retrieval or a model; clients get a real answer today, before D-09 exists.
+
+**Implemented.** `_salary_tax_input`, `_build_calculation_message`, `_inr`
+(Indian digit grouping) in `agents/ca_consultation_agent.py`. New profile fields
+for basic + DA, 80C, 80D (self, parents, parents' age), NPS, home-loan
+interest, other income, professional tax and tax year, each parsed from chat.
+
+**Trade-offs.** The reply is templated, not conversational, and does not explain
+*why* one regime wins beyond the figures. CTC is used as gross salary, which
+overstates income when CTC includes employer PF or gratuity (stated as an
+assumption in every reply). The new amount parsing extends the brittle regex
+approach of D-07.
+
+**Revisit when.** D-09 lets an LLM explain the result in natural language
+using typed claims that reference this calculation's run ID.
+
+---
+
+## D-19 Ask only for facts the calculation needs
+
+**Date:** 2026-10-16 · **Status:** Accepted
+
+**Decision.** Required facts are: gross salary, basic + DA, age, residency and
+rent; city and HRA only if rent is paid; whether the client has deductions,
+health insurance and other income; and the amount for each item they say they
+have. Regime preference and Form 16 no longer block the answer. A basic salary
+above gross salary is asked again.
+
+**Why.** Every question costs the client effort. Both regimes are always
+calculated, so the preference is unnecessary; Form 16 belongs in the evidence
+checklist, not the calculation.
+
+**Trade-offs.** The agent no longer checks that TDS has been deducted before
+answering; the evidence checklist covers it instead.
+
+---
+
+## D-20 Default to the latest verified tax year, and say so
+
+**Date:** 2026-10-16 · **Status:** Accepted
+
+**Context.** It is October 2026, so planning questions are about FY 2026-27, but
+only FY 2025-26 is verified (D-12).
+
+**Decision.** If the client names no year, calculate the latest verified year
+and state that in the assumptions. If they name an unverified year
+("FY 2026-27"), reply `unsupported_year` and offer the verified year or a CA.
+
+**Why.** An answer for a slightly older year, clearly labelled, is useful; a
+silent guess at new-law rates is not.
+
+**Trade-offs.** Clients planning for the current year get last year's figures
+until FY 2026-27 rules are added.
+
+**Revisit when.** FY 2026-27 rules are verified; this decision then needs no change.
+
+---
+
+## D-21 Calculation IDs hash canonical figures
+
+**Date:** 2026-10-16 · **Status:** Accepted
+
+**Context.** Integration testing found that the same figures produced different
+run IDs depending on `int` vs `float` and float noise (`30000/12*12`).
+
+**Decision.** Numbers are rounded to 2 decimal places and cast to float before
+hashing.
+
+**Why.** D-09 claims cite run IDs; equal inputs must give equal IDs.
+
+**Trade-offs.** Inputs differing by less than one paisa share an ID, which is harmless.
+
+---
+
+## D-22 Follow-up answers continue the consultation
+
+**Date:** 2026-10-16 · **Status:** Accepted
+
+**Context.** A reply that only answers the agent's questions ("rent 25k, no other
+income") has no tax keywords, so it was routed as a general question and the
+facts were ignored.
+
+**Decision.** If a consultation is already in progress (the passed-in profile is
+not empty) and the message adds facts, stay in salary tax planning. A new
+question that adds no facts is still routed normally.
+
+**Trade-offs.** Topic is still inferred per message by keywords. A message
+that both adds facts and asks something unrelated stays in the tax flow.
+
+**Revisit when.** The D-10 orchestrator keeps explicit conversation state
+(current workflow) instead of inferring it.

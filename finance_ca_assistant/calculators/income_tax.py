@@ -118,7 +118,7 @@ def compare_regimes(inputs: SalaryTaxInput) -> RegimeComparison:
         lower = "equal"
     else:
         lower = "old" if old.total_tax < new.total_tax else "new"
-    payload = {"inputs": asdict(inputs), "rules": rules.tax_year, "calc_version": CALC_VERSION}
+    payload = {"inputs": _canonical(asdict(inputs)), "rules": rules.tax_year, "calc_version": CALC_VERSION}
     run_id = "calc_" + hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:12]
     return RegimeComparison(
         run_id=run_id,
@@ -229,6 +229,15 @@ def _compute(inp: SalaryTaxInput, year: TaxYearRules, regime: RegimeRules) -> Re
         total_tax=total,
         steps=steps,
     )
+
+
+def _canonical(values: Dict[str, object]) -> Dict[str, object]:
+    """Make equal figures hash equally: 2000000, 2000000.0 and 2000000.0000001 match."""
+
+    return {
+        key: round(float(value), 2) if isinstance(value, (int, float)) and not isinstance(value, bool) else value
+        for key, value in values.items()
+    }
 
 
 def _slabs_for(inp: SalaryTaxInput, regime: RegimeRules) -> Slabs:

@@ -6,7 +6,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from finance_ca_assistant.calculators import RegimeComparison, SalaryTaxInput, UnsupportedTaxYear, compare_regimes
+from finance_ca_assistant.calculators.tax_rules import RULES_BY_YEAR
 from finance_ca_assistant.retrieval.result_formatter import format_retrieval_results
+
+# Used when the client does not name a year. Planning for a later year must
+# wait until that year's rules are verified (see decisionsForCA.md D-12).
+LATEST_VERIFIED_TAX_YEAR = max(RULES_BY_YEAR)
 
 
 @dataclass(frozen=True)
@@ -14,7 +20,9 @@ class ClientProfile:
     """Facts needed before a CA-style personal tax planning answer is reliable."""
 
     annual_salary_ctc: Optional[float] = None
+    annual_basic_da: Optional[float] = None
     salary_currency: str = "INR"
+    tax_year: Optional[str] = None
     age: Optional[int] = None
     residential_status: Optional[str] = None
     tax_regime_preference: Optional[str] = None
@@ -27,6 +35,15 @@ class ClientProfile:
     other_income: Optional[str] = None
     employer_tds_or_form16: Optional[str] = None
     goals: Optional[str] = None
+    # Annual rupee amounts the calculator needs. Zero means "has none".
+    deduction_80c_amount: Optional[float] = None
+    health_premium_self_family: Optional[float] = None
+    health_premium_parents: Optional[float] = None
+    parents_senior: Optional[bool] = None
+    nps_self_amount: Optional[float] = None
+    home_loan_interest: Optional[float] = None
+    other_income_amount: Optional[float] = None
+    professional_tax: Optional[float] = None
 
     @classmethod
     def from_mapping(cls, data: Optional[Mapping[str, Any]]) -> "ClientProfile":
@@ -62,15 +79,16 @@ class AgentResponse:
     profile_updates: Dict[str, Any] = field(default_factory=dict)
     retrieved_sources: str = ""
     answer: Optional[Dict[str, Any]] = None
+    calculation: Optional[RegimeComparison] = None
 
 
 class CAConsultationAgent:
     """Agentic conversational wrapper around the CA RAG pipeline.
 
-    The agent first gathers client facts, then uses RAG for grounded document
-    context. It is intentionally conservative: it can suggest legal planning
-    areas to evaluate, but it does not calculate liability or recommend a final
-    tax position until required facts are available.
+    The agent first gathers client facts. For salary tax planning it then runs
+    the deterministic regime calculator and builds the reply from its output,
+    so every figure comes from code and cites the provision behind it. No
+    client facts are sent to retrieval or to an LLM in that flow.
     """
 
     def __init__(self, pipeline: Any) -> None:
@@ -86,9 +104,14 @@ class CAConsultationAgent:
         """Respond conversationally to a client advisory message."""
 
         selected_profile = profile if isinstance(profile, ClientProfile) else ClientProfile.from_mapping(profile)
+        consultation_in_progress = selected_profile != ClientProfile()
         updates = _infer_profile_updates(user_message)
         selected_profile = selected_profile.with_updates(updates)
         topic = _classify_topic(user_message)
+        # A message that only answers earlier questions ("rent 25k, no other
+        # income") continues the consultation instead of starting a new topic.
+        if topic == "general" and consultation_in_progress and updates:
+            topic = "salary_tax_planning"
 
         if topic == "salary_tax_planning":
             return self._salary_tax_planning_turn(
@@ -115,6 +138,7 @@ class CAConsultationAgent:
         top_k: int,
     ) -> AgentResponse:
         missing_fields = _missing_salary_tax_fields(profile)
+        # A fixed query: client facts never go into retrieval.
         retrieval_query = (
             "salary tax planning legal deductions old regime new regime HRA 80C 80D NPS "
             "income tax compliance documentation Form 16"
@@ -133,15 +157,25 @@ class CAConsultationAgent:
                 retrieved_sources=retrieved_sources,
             )
 
-        grounded_question = _build_salary_tax_question(user_message, profile)
-        answer = self.pipeline.answer(grounded_question, top_k=top_k)
-        message = _build_advisory_message(answer.answer, profile)
+        tax_input, assumptions = _salary_tax_input(profile)
+        try:
+            comparison = compare_regimes(tax_input)
+        except UnsupportedTaxYear:
+            return AgentResponse(
+                status="unsupported_year",
+                message=(
+                    f"I can't calculate {tax_input.tax_year} yet: its tax rules have not been verified in this tool. "
+                    f"I can calculate {LATEST_VERIFIED_TAX_YEAR} instead, or a CA can advise on {tax_input.tax_year}."
+                ),
+                profile_updates=profile_updates,
+                retrieved_sources=retrieved_sources,
+            )
         return AgentResponse(
-            status=str(answer.answer.get("status", "abstained")),
-            message=message,
+            status="calculated",
+            message=_build_calculation_message(comparison, assumptions, profile),
             profile_updates=profile_updates,
-            retrieved_sources=format_retrieval_results(answer.retrieved),
-            answer=answer.answer,
+            retrieved_sources=retrieved_sources,
+            calculation=comparison,
         )
 
 
@@ -151,7 +185,7 @@ def _classify_topic(message: str) -> str:
     planning_terms = {"save tax", "tax saving", "deduction", "investment", "legal", "old regime", "new regime"}
     if any(term in text for term in salary_terms) and any(term in text for term in planning_terms):
         return "salary_tax_planning"
-    if "tax" in text and any(term in text for term in {"save", "planning", "invest", "deduction"}):
+    if "tax" in text and any(term in text for term in {"save", "plan", "invest", "deduction", "regime"}):
         return "salary_tax_planning"
     return "general"
 
@@ -237,6 +271,51 @@ def _infer_profile_updates(message: str) -> Dict[str, Any]:
         if found:
             updates["other_income"] = ", ".join(found)
 
+    basic = _amount_after(_BASIC_LABEL, text)
+    if basic is not None:
+        updates["annual_basic_da"] = _annual(basic)
+
+    year_match = re.search(r"\b(?:fy|financial year)?\s*(20\d\d)\s*-\s*(\d\d)\b", text)
+    if year_match:
+        updates["tax_year"] = f"FY{year_match.group(1)}-{year_match.group(2)}"
+
+    # Amounts for the calculator. "None" answers above count as zero.
+    if updates.get("deductions_investments") == "none":
+        updates["deduction_80c_amount"] = 0.0
+    else:
+        amount = _amount_after(r"\b(?:section\s+)?80c\b(?:\s+(?:investments?|deductions?|total))?", text)
+        if amount is not None:
+            updates["deduction_80c_amount"] = _annual(amount)
+
+    if updates.get("health_insurance") == "none":
+        updates["health_premium_self_family"] = 0.0
+        updates["health_premium_parents"] = 0.0
+    else:
+        parents = _amount_after(_PARENTS_PREMIUM_LABEL, text)
+        if parents is not None:
+            updates["health_premium_parents"] = _annual(parents)
+        own = _amount_after(_SELF_PREMIUM_LABEL, text)
+        if own is not None:
+            updates["health_premium_self_family"] = _annual(own)
+    if re.search(r"\bsenior citizen parents?\b|\bparents? (?:are|is) (?:senior|above 60|over 60)\b", text):
+        updates["parents_senior"] = True
+
+    nps = _amount_after(r"\bnps\b(?:\s+contribution)?", text)
+    if nps is not None:
+        updates["nps_self_amount"] = _annual(nps)
+
+    loan_interest = _amount_after(r"\b(?:home loan interest|interest on (?:my )?home loan)\b", text)
+    if loan_interest is not None:
+        updates["home_loan_interest"] = _annual(loan_interest)
+
+    if updates.get("other_income") == "none":
+        updates["other_income_amount"] = 0.0
+    else:
+        amounts = [_amount_after(label, text) for label in _OTHER_INCOME_AMOUNT_LABELS]
+        found = [_annual(amount) for amount in amounts if amount is not None]
+        if found:
+            updates["other_income_amount"] = sum(found)
+
     if re.search(_NEGATION + r"(?:form\s*-?\s*16|salary slips?)\b", text):
         updates["employer_tds_or_form16"] = "not available"
     elif re.search(r"\bform\s*-?\s*16\b|\bsalary slips?\b", text):
@@ -269,6 +348,20 @@ _SALARY_LABEL = (
     r"\b(?:salary|ctc|earning|"
     + "".join(f"(?<!{word} )" for word in _NON_SALARY_INCOME_WORDS)
     + r"income)"
+)
+
+_BASIC_LABEL = r"\bbasic(?:\s+(?:salary|pay))?(?:\s*(?:\+|and|plus)\s*da)?\b"
+_PARENTS_PREMIUM_LABEL = (
+    r"\bparents'?\s*(?:(?:health|medical)\s+)?(?:insurance|premium|mediclaim)(?:\s+premium)?\b"
+)
+_SELF_PREMIUM_LABEL = (
+    r"(?<!parents )(?<!parents' )\b(?:(?:health|medical)\s+insurance(?:\s+premium)?|mediclaim|80d)\b"
+)
+_OTHER_INCOME_AMOUNT_LABELS = (
+    r"\bother\s+income\b",
+    r"(?<!loan )\binterest\s+income\b",
+    r"\bfreelanc\w*\s+income\b",
+    r"\brental\s+income\b",
 )
 
 _DEDUCTION_TERMS = (
@@ -343,26 +436,61 @@ def _amount_after(label_pattern: str, text: str) -> Optional[Tuple[float, Option
     return amount, period
 
 
+def _annual(parsed: Tuple[float, Optional[str]]) -> float:
+    """Annualise an amount whose period defaults to yearly."""
+
+    amount, period = parsed
+    return amount * 12 if period == "month" else amount
+
+
 def _missing_salary_tax_fields(profile: ClientProfile) -> List[str]:
-    required = [
-        "annual_salary_ctc",
-        "age",
-        "residential_status",
-        "tax_regime_preference",
-        "city",
-        "monthly_rent",
-        "monthly_hra",
-        "deductions_investments",
-        "health_insurance",
-        "other_income",
-        "employer_tds_or_form16",
+    """Facts the regime calculation still needs, in the order to ask them.
+
+    Both regimes are always calculated, so a regime preference is not needed.
+    Amount questions are asked only when the client said they have the item.
+    """
+
+    def missing(name: str) -> bool:
+        return getattr(profile, name) in (None, "")
+
+    needed = [
+        name for name in ("annual_salary_ctc", "annual_basic_da", "age", "residential_status", "monthly_rent")
+        if missing(name)
     ]
-    return [field_name for field_name in required if getattr(profile, field_name) in (None, "")]
+    if (
+        not missing("annual_basic_da")
+        and not missing("annual_salary_ctc")
+        and profile.annual_basic_da > profile.annual_salary_ctc
+    ):
+        needed.append("annual_basic_da")
+    if profile.monthly_rent:
+        needed += [name for name in ("city", "monthly_hra") if missing(name)]
+    for name in ("deductions_investments", "health_insurance", "other_income"):
+        if missing(name):
+            needed.append(name)
+
+    deductions = (profile.deductions_investments or "").lower()
+    if deductions and deductions != "none" and missing("deduction_80c_amount"):
+        needed.append("deduction_80c_amount")
+    if "nps" in deductions and missing("nps_self_amount"):
+        needed.append("nps_self_amount")
+    if "home loan" in deductions and missing("home_loan_interest"):
+        needed.append("home_loan_interest")
+    if (
+        profile.health_insurance == "yes"
+        and missing("health_premium_self_family")
+        and missing("health_premium_parents")
+    ):
+        needed.append("health_premium_self_family")
+    if profile.other_income and profile.other_income != "none" and missing("other_income_amount"):
+        needed.append("other_income_amount")
+    return list(dict.fromkeys(needed))
 
 
 def _questions_for_missing_fields(missing_fields: Sequence[str]) -> List[str]:
     question_bank = {
-        "annual_salary_ctc": "What is your annual CTC/gross salary, and what is the basic salary component?",
+        "annual_salary_ctc": "What is your annual gross salary (CTC)?",
+        "annual_basic_da": "What is your basic salary plus DA per year? It must not exceed your gross salary.",
         "age": "What is your age?",
         "residential_status": "Are you resident, non-resident, or not ordinarily resident for Indian income-tax purposes?",
         "tax_regime_preference": "Are you currently opting for the new regime, old regime, or should we compare both?",
@@ -373,6 +501,11 @@ def _questions_for_missing_fields(missing_fields: Sequence[str]) -> List[str]:
         "health_insurance": "Do you pay medical insurance premium for self, family, or parents?",
         "other_income": "Do you have other income such as interest, capital gains, freelancing, rent, or RSUs/ESOPs?",
         "employer_tds_or_form16": "Do you have latest salary slips, Form 16, and current TDS/projection from employer?",
+        "deduction_80c_amount": "How much do you invest under Section 80C per year in total (EPF, PPF, ELSS, life insurance, tuition fees, principal on home loan)?",
+        "nps_self_amount": "How much do you contribute to NPS yourself per year?",
+        "home_loan_interest": "How much home-loan interest do you pay per year on the house you live in?",
+        "health_premium_self_family": "What is the yearly health insurance premium for yourself and family, and separately for your parents (and are they 60 or older)?",
+        "other_income_amount": "Roughly how much other income (interest, freelancing, rent) do you get per year?",
     }
     return [question_bank[field_name] for field_name in missing_fields[:7]]
 
@@ -401,20 +534,114 @@ def _build_fact_gathering_message(profile: ClientProfile, questions: Sequence[st
     )
 
 
-def _build_salary_tax_question(user_message: str, profile: ClientProfile) -> str:
-    return (
-        "Act as an Indian CA. Build a legal salary tax planning consultation using retrieved documents where available. "
-        "Compare old and new regime considerations, identify deduction/documentation areas, red flags, and next steps. "
-        f"Client facts: {profile.as_dict()}. User request: {user_message}"
+def _salary_tax_input(profile: ClientProfile) -> Tuple[SalaryTaxInput, List[str]]:
+    """Map a complete profile to calculator input, listing every assumption made."""
+
+    year = profile.tax_year or LATEST_VERIFIED_TAX_YEAR
+    assumptions = [
+        "Gross salary is taken as your stated CTC. Employer PF and gratuity in CTC are not taxable salary, "
+        "so the real tax may be lower.",
+    ]
+    if not profile.tax_year:
+        assumptions.append(f"Calculated under {year} rules, the latest year verified in this tool.")
+    city = (profile.city or "").lower()
+    metro = city in _METRO_CITIES or city == "metro"
+    if profile.monthly_rent:
+        assumptions.append(
+            f"HRA exemption uses {'metro (50%)' if metro else 'non-metro (40%)'} limits for {(profile.city or '').title()}."
+        )
+    if profile.health_premium_parents and profile.parents_senior is None:
+        assumptions.append("Parents are assumed to be under 60 for the Section 80D limit.")
+    if profile.professional_tax is None:
+        assumptions.append("No professional tax is assumed.")
+    status = profile.residential_status or "resident"
+    tax_input = SalaryTaxInput(
+        tax_year=year,
+        gross_salary=float(profile.annual_salary_ctc or 0),
+        basic_da=float(profile.annual_basic_da or 0),
+        age=int(profile.age or 0),
+        # RNOR is still a resident for the rebate and senior slabs.
+        resident=status in {"resident", "not-ordinarily-resident"},
+        hra_received=float(profile.monthly_hra or 0) * 12,
+        rent_paid=float(profile.monthly_rent or 0) * 12,
+        metro=metro,
+        professional_tax=float(profile.professional_tax or 0),
+        other_income=float(profile.other_income_amount or 0),
+        deduction_80c=float(profile.deduction_80c_amount or 0),
+        health_premium_self_family=float(profile.health_premium_self_family or 0),
+        health_premium_parents=float(profile.health_premium_parents or 0),
+        parents_senior=bool(profile.parents_senior),
+        nps_self_80ccd_1b=float(profile.nps_self_amount or 0),
+        home_loan_interest_self_occupied=float(profile.home_loan_interest or 0),
     )
+    return tax_input, assumptions
 
 
-def _build_advisory_message(answer: Dict[str, Any], profile: ClientProfile) -> str:
-    return (
-        f"{answer.get('answer', '')}\n\n"
-        f"CA analysis: {answer.get('ca_analysis', '')}\n\n"
-        f"Risks/red flags: {', '.join(answer.get('risks') or [])}\n\n"
-        f"Missing info: {answer.get('missing_info', '')}\n\n"
-        f"Next steps: {', '.join(answer.get('next_steps') or [])}\n\n"
-        f"Profile used: {profile.as_dict()}"
-    ).strip()
+def _inr(amount: float) -> str:
+    """Format rupees with Indian digit grouping: 1234567 -> Rs 12,34,567."""
+
+    rounded = int(round(amount))
+    sign, digits = ("-" if rounded < 0 else ""), str(abs(rounded))
+    if len(digits) > 3:
+        head, tail = digits[:-3], digits[-3:]
+        head = ",".join([head[max(0, i - 2):i] for i in range(len(head), 0, -2)][::-1])
+        digits = f"{head},{tail}"
+    return f"{sign}\u20b9{digits}"
+
+
+def _build_calculation_message(comparison: RegimeComparison, assumptions: Sequence[str], profile: ClientProfile) -> str:
+    old, new = comparison.old, comparison.new
+    rows = [
+        ("Taxable income", old.taxable_income, new.taxable_income),
+        ("Tax at slab rates", old.tax_on_income, new.tax_on_income),
+        ("Rebate (87A)", -old.rebate, -new.rebate),
+        ("Surcharge", old.surcharge, new.surcharge),
+        ("Cess (4%)", old.cess, new.cess),
+        ("Total tax", old.total_tax, new.total_tax),
+    ]
+    table = "\n".join(f"| {label} | {_inr(a)} | {_inr(b)} |" for label, a, b in rows)
+    if comparison.lower_regime == "equal":
+        verdict = "Both regimes give the same tax."
+    else:
+        verdict = (
+            f"The {comparison.lower_regime} regime is lower by {_inr(comparison.saving)} for {comparison.tax_year}."
+        )
+    if profile.tax_regime_preference in {"old", "new"} and profile.tax_regime_preference != comparison.lower_regime \
+            and comparison.lower_regime != "equal":
+        verdict += f" You mentioned the {profile.tax_regime_preference} regime; it costs more on these figures."
+
+    def deduction_lines(result_steps) -> List[str]:
+        return [
+            f"- {step.label.removeprefix('Less: ')}: {_inr(-step.amount)} ({step.source})"
+            for step in result_steps
+            if step.label.startswith("Less:")
+        ]
+
+    old_lines = deduction_lines(old.steps) or ["- none"]
+    new_lines = deduction_lines(new.steps) or ["- none"]
+    return "\n".join(
+        [
+            f"Old vs new regime, {comparison.tax_year} ({comparison.law}). Calculation {comparison.run_id}.",
+            "",
+            "| | Old regime | New regime |",
+            "|---|---|---|",
+            table,
+            "",
+            verdict,
+            "",
+            "Deductions applied, old regime:",
+            *old_lines,
+            "Deductions applied, new regime:",
+            *new_lines,
+            "",
+            "Assumptions:",
+            *[f"- {item}" for item in assumptions],
+            "",
+            "Not included in this calculation:",
+            *[f"- {item}" for item in comparison.not_modelled],
+            "",
+            "Keep as evidence: Form 16, salary slips, rent receipts (and landlord PAN if rent exceeds "
+            "\u20b91 lakh a year), investment and insurance premium receipts, interest certificates.",
+            "This is a calculation to support your decision, not filing advice. Confirm with a CA before you file.",
+        ]
+    )

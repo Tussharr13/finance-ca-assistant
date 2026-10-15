@@ -104,6 +104,8 @@ def test_every_step_cites_a_source_and_run_id_is_stable():
     assert all(step.source for step in first.old.steps + first.new.steps)
     assert first.run_id == compare_regimes(salary()).run_id
     assert first.run_id != compare_regimes(salary(other_income=10)).run_id
+    # Same figures, different numeric types or float noise: same ID.
+    assert compare_regimes(salary(gross_salary=2_000_000.0000001, rent_paid=0.0)).run_id == first.run_id
     assert first.not_modelled
 
 

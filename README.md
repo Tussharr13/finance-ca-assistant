@@ -176,7 +176,11 @@ print(consultation.status)
 print(consultation.message)
 ```
 
-For salary tax planning, the agent first asks for missing client facts such as
-CTC, age, residential status, regime preference, HRA/rent, deductions, insurance,
-other income, and Form 16/TDS details. It only moves to advice once the required
-facts are available.
+For salary tax planning, the agent first asks for the facts the calculation
+needs: gross salary, basic + DA, age, residency, rent (and HRA and city if rent
+is paid), and the amounts of any deductions, health insurance and other income
+the client has. Pass `consultation.profile_updates` back as `profile` on the
+next turn. Once the facts are complete, the reply has status `calculated` and is
+built from the regime calculator, not the LLM: both regimes side by side, the
+deductions applied with their sections, assumptions, and what is not included.
+The full result is on `consultation.calculation`.
