@@ -5,6 +5,9 @@ indices_dir: /kaggle/working/data/indices
 manifest_path: /kaggle/working/data/pdfs_manifest.json
 clause_index_path: /kaggle/working/data/clause_index.json
 chunks_path: /kaggle/working/data/processed/chunks.jsonl
-embedding_model: BAAI/bge-m3
-chat_model: Qwen/Qwen3-4B
+# Match the notebook's Section 4 defaults. A fine-tuned model adopted in
+# Section 10 replaces embedding_model automatically when its dataset is attached.
+embedding_model: BAAI/bge-small-en-v1.5
+chat_model: Qwen/Qwen3-0.6B
+query_generation_model: Qwen/Qwen3-4B
 retrieval_top_k: 6

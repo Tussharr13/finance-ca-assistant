@@ -120,6 +120,22 @@ ranges, legal freshness checks, or tenant authorization.
 
 The notebook integration and live Kaggle verification follow backend work.
 
+## Retrieval Fine-tuning
+
+Notebook Sections 7-10 fine-tune the embedding model on your own corpus:
+
+1. Qwen3 generates CA search questions per chunk (resumable checkpoint in
+   `finetune/queries.jsonl`), split into train and eval by page.
+2. The current model is scored on held-out pages: recall@k and MRR, dense-only
+   and through the full hybrid pipeline.
+3. `bge-small` is trained on (question, passage, near-miss passage) triplets.
+4. The new model is adopted only if hybrid page MRR improves without losing
+   recall@5; scores are written to `finetune/report.json`.
+
+Republish `finance_ca_assistant_artifacts` as a Kaggle Dataset after an adopted
+run; Section 4 loads the adopted model automatically when it is attached. The
+code lives in `finance_ca_assistant/finetuning/`.
+
 ## Tax Calculators
 
 Numbers in answers come from deterministic calculators, never from the LLM.

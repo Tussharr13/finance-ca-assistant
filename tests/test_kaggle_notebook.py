@@ -103,3 +103,24 @@ def test_kaggle_section_4_is_staged_and_safe_by_default():
     for offset, cell in enumerate(section_cells):
         if cell["cell_type"] == "code":
             compile("".join(cell["source"]), f"section4_cell_{offset}", "exec")
+
+
+def test_finetune_sections_are_gated_resumable_and_compile():
+    cells = _load_notebook_cells()
+    start = next(
+        index
+        for index, cell in enumerate(cells)
+        if "".join(cell.get("source", [])).startswith("## 7.")
+    )
+    section_cells = cells[start:]
+    section_source = "\n".join("".join(cell.get("source", [])) for cell in section_cells)
+
+    assert "RUN_FINETUNE = GPU_AVAILABLE" in section_source
+    assert "generate_queries(" in section_source
+    assert "split_pairs(" in section_source
+    assert "candidate_model_dir" in section_source
+    assert "adopt_finetuned_model(" in section_source
+    assert "report.json" in section_source
+    for offset, cell in enumerate(section_cells):
+        if cell["cell_type"] == "code":
+            compile("".join(cell["source"]), f"finetune_cell_{offset}", "exec")

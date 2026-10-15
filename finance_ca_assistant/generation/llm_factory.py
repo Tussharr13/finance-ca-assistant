@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
+
+# Qwen3 chat templates enable thinking by default; the reasoning block must
+# never reach JSON parsing or users.
+_THINK_BLOCK = re.compile(r"<think>.*?(?:</think>|$)", flags=re.DOTALL | re.IGNORECASE)
 
 
 class LLMClient(ABC):
@@ -68,6 +73,33 @@ class HuggingFacePipelineLLM(LLMClient):
         output = self.pipeline(messages, **generation_kwargs)
         return self._extract_text(output)
 
+    def generate_batch(
+        self,
+        system_prompt: str,
+        user_prompts: Sequence[str],
+        max_tokens: int = 900,
+        batch_size: int = 8,
+    ) -> List[str]:
+        """Generate one response per prompt, batching on the GPU."""
+
+        if not user_prompts:
+            return []
+        conversations = [
+            [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
+            for prompt in user_prompts
+        ]
+        tokenizer = getattr(self.pipeline, "tokenizer", None)
+        if tokenizer is not None:
+            # Decoder-only models must be left-padded for batched generation.
+            tokenizer.padding_side = "left"
+            if getattr(tokenizer, "pad_token", None) is None:
+                tokenizer.pad_token = tokenizer.eos_token
+        generation_kwargs: Dict[str, Any] = {"do_sample": self.do_sample, "max_new_tokens": max_tokens}
+        if self.do_sample:
+            generation_kwargs["temperature"] = self.temperature
+        outputs = self.pipeline(conversations, batch_size=batch_size, **generation_kwargs)
+        return [self._extract_text(output) for output in outputs]
+
     def _prompt_token_count(self, messages: List[Dict[str, str]]) -> Optional[int]:
         tokenizer = getattr(self.pipeline, "tokenizer", None)
         if tokenizer is None or not hasattr(tokenizer, "apply_chat_template"):
@@ -92,6 +124,10 @@ class HuggingFacePipelineLLM(LLMClient):
 
     @staticmethod
     def _extract_text(output: object) -> str:
+        return _THINK_BLOCK.sub("", HuggingFacePipelineLLM._raw_text(output)).strip()
+
+    @staticmethod
+    def _raw_text(output: object) -> str:
         if isinstance(output, str):
             return output
         if isinstance(output, list) and output:
