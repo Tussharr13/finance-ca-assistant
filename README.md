@@ -120,6 +120,27 @@ ranges, legal freshness checks, or tenant authorization.
 
 The notebook integration and live Kaggle verification follow backend work.
 
+## Tax Calculators
+
+Numbers in answers come from deterministic calculators, never from the LLM.
+`compare_regimes` computes old and new regime tax for a salaried individual:
+
+```python
+from finance_ca_assistant.calculators import SalaryTaxInput, compare_regimes
+
+result = compare_regimes(SalaryTaxInput(
+    tax_year="FY2025-26", gross_salary=2_000_000, basic_da=1_000_000, age=30,
+    hra_received=400_000, rent_paid=360_000, metro=True, deduction_80c=150_000,
+))
+print(result.lower_regime, result.saving, result.run_id)
+```
+
+Each step records the provision it relies on, and the result lists what the
+calculator does not model. Rules live in effective-dated tables in
+`calculators/tax_rules.py`; only FY 2025-26 is verified. Other years raise
+`UnsupportedTaxYear` until their tables are added and checked, including the
+Income-tax Act, 2025 years from 1 April 2026.
+
 ## Agentic Consultation
 
 Use the consultation wrapper when the user asks for advisory workflows rather
