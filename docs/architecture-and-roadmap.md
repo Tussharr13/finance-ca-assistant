@@ -214,7 +214,7 @@ flowchart LR
     BM25[BM25 keyword search]
     Clause[Clause and section lookup]
     Fusion[Weighted hybrid merge]
-    Rerank[Keyword reranker by default]
+    Rerank[Explicitly configured reranker only]
     Answer[Structured answer scaffold]
     Consult[Salary-tax fact gathering]
     Artifacts[Chunks, embeddings and clause index]
@@ -263,7 +263,8 @@ when corpus limits, models, or notebook outputs change.
 - In-memory dense vector search.
 - BM25 keyword retrieval.
 - Direct statutory and reference lookup.
-- Weighted hybrid retrieval and local keyword reranking.
+- Weighted reciprocal rank fusion across dense, BM25, and clause retrieval; optional explicit reranking.
+- Exact metadata filters applied in all three retrieval channels before candidate limits, exposed through `answer()` and `retrieve_chunks()`.
 - Optional Hugging Face embedding, reranker, and Qwen provider implementations.
 - Deterministic fallbacks for tests and resource-safe smoke runs.
 - Structured answer fields for evidence, confidence, CA analysis, risks,
@@ -279,13 +280,13 @@ when corpus limits, models, or notebook outputs change.
 |---|---|
 | Knowledge coverage | The bounded corpus is too narrow for the intended product. It does not contain sufficient evidence for the salary-tax demonstration. |
 | Generation | The real LLM is disabled by default, so output is a conservative template rather than a substantive expert answer. |
-| Reranking | The Hugging Face cross-encoder is disabled; the default is a lightweight local keyword reranker. |
+| Reranking | Backend defaults to no reranker. Keyword and Hugging Face rerankers require explicit configuration; notebook status text still needs updating. |
 | Persistence | Saved embeddings and clause mappings can be reloaded; the lightweight BM25 index is still rebuilt in memory. |
 | Cache correctness | Chunks are fingerprinted by source metadata and ingestion settings, but source updates are not fetched incrementally yet. |
-| Hybrid scoring | Raw dense, BM25, and clause scores are combined without normalization or calibration. |
-| Citations | Retrieved source snippets are attached to the answer, but evidence is not yet verified claim by claim. |
-| Confidence | Confidence is based largely on retrieved chunk count rather than authority, relevance, freshness, and agreement. |
-| Citation validator | A validator exists but is not integrated into the main generation path. |
+| Hybrid scoring | Weighted reciprocal rank fusion avoids incompatible raw-score scales. Weights and relevance quality still need corpus evaluation; fusion scores are not confidence probabilities. |
+| Citations | Generation accepts only complete exact chunk extracts with unique IDs and source/page attribution; any invalid claim blocks the answer. Semantic support and applicability remain unverified. |
+| Confidence | Always `not_assessed`; evidence status reports quote matching separately. No chunk-count confidence. |
+| Citation validator | Exact-extract checks are integrated into generation. Legacy token overlap is not an acceptance gate. See [citation policy](citation-enforcement.md). |
 | Consultation | Only a heuristic salary-tax workflow exists. Other topics pass directly to ordinary RAG. |
 | Conversation state | `history` is accepted by the API but is not used. Client profiles are not persisted. |
 | Calculations | There is no tax, regime, HRA, TDS, GST, cash-flow, portfolio, or property calculation engine. |
@@ -342,9 +343,12 @@ retrieval artifacts, and can reuse the corpus instead of rebuilding it.
 - [x] Reload saved embeddings and clause mappings instead of recomputing dense vectors.
 - [ ] Persist and reload the BM25 index.
 - [ ] Add OCR and table extraction.
-- [ ] Normalize or calibrate hybrid retrieval scores.
-- [ ] Integrate claim-level citation validation.
-- [ ] Replace chunk-count confidence with evidence-quality confidence.
+- [x] Replace raw-score addition with weighted reciprocal rank fusion (backend regression-tested).
+- [x] Apply exact metadata filters across dense, BM25, and clause search before truncation.
+- [ ] Benchmark retrieval quality on representative, labelled questions; enforce date applicability separately from exact metadata matching.
+- [x] Enforce exact-extract claim citations and fail-closed abstention in the backend.
+- [x] Remove chunk-count confidence; report unassessed confidence and separate attribution status.
+- [ ] Evaluate semantic support, relevance, freshness, and applicability before introducing evidence-quality confidence.
 - [ ] Build an expert-labelled benchmark across tax, GST, audit, and accounting.
 - [ ] Establish retrieval quality, latency, CPU, RAM, and GPU baselines.
 - [ ] Enable the neural reranker only after resource benchmarks pass.

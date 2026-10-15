@@ -101,6 +101,25 @@ HF_LLM_MODEL = "Qwen/Qwen3-4B"
 Use `BAAI/bge-m3`, `BAAI/bge-reranker-v2-m3`, or `Qwen/Qwen3-8B` only after the
 small stack is stable on the selected Kaggle GPU.
 
+## Backend retrieval behavior
+
+Answer generation enforces the [citation contract](docs/citation-enforcement.md).
+It returns exact attributed extracts or abstains; confidence is `not_assessed`.
+Default EchoLLM runs still retrieve evidence but abstain from generating answers.
+
+Hybrid search uses weighted reciprocal rank fusion (`weight / (60 + rank)`)
+instead of adding incompatible cosine, BM25, and clause scores. These scores
+indicate ranking agreement, not answer confidence. No reranker is enabled
+implicitly; pass an explicit reranker to the pipeline to enable one.
+
+`pipeline.answer(..., metadata_filter={"jurisdiction": "IN"})` and
+`pipeline.retrieve_chunks(..., metadata_filter={"source": "source-id"})`
+apply exact matching in all three channels before candidate limits. Every
+specified field must be present and match. This does not yet implement date
+ranges, legal freshness checks, or tenant authorization.
+
+The notebook integration and live Kaggle verification follow backend work.
+
 ## Agentic Consultation
 
 Use the consultation wrapper when the user asks for advisory workflows rather

@@ -58,13 +58,13 @@ class InMemoryVectorStore(VectorStoreBase):
         top_k: int,
         metadata_filter: Optional[Dict[str, Any]] = None,
     ) -> List[VectorSearchResult]:
-        if self.embeddings is None or not self.chunks:
+        if top_k <= 0 or self.embeddings is None or not self.chunks:
             return []
         query = np.asarray(query_embedding, dtype=np.float32)
         indexes = [
             index
             for index, chunk in enumerate(self.chunks)
-            if not metadata_filter or all(chunk.get(key) == value for key, value in metadata_filter.items())
+            if not metadata_filter or all(key in chunk and chunk[key] == value for key, value in metadata_filter.items())
         ]
         if not indexes:
             return []
@@ -81,4 +81,3 @@ def cosine_similarity(query: np.ndarray, matrix: np.ndarray) -> np.ndarray:
     matrix_norms = np.linalg.norm(matrix, axis=1)
     denominator = np.where(matrix_norms * query_norm == 0, 1e-12, matrix_norms * query_norm)
     return np.dot(matrix, query) / denominator
-

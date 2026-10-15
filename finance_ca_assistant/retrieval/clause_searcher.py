@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from finance_ca_assistant.domain_index import extract_references
 
@@ -51,11 +51,18 @@ class ClauseSearcher:
             ]
         return cls(mapping)
 
-    def search(self, query: str, top_k: int = 10) -> List[ClauseSearchResult]:
+    def search(self, query: str, top_k: int = 10, metadata_filter: Optional[Dict[str, Any]] = None) -> List[ClauseSearchResult]:
+        if top_k <= 0:
+            return []
         results: List[ClauseSearchResult] = []
         seen = set()
         for reference in extract_references(query):
             for chunk in self.chunks_by_reference.get(reference.normalized, []):
+                if metadata_filter and not all(
+                    key in chunk and chunk[key] == value
+                    for key, value in metadata_filter.items()
+                ):
+                    continue
                 chunk_id = chunk.get("id")
                 if chunk_id in seen:
                     continue

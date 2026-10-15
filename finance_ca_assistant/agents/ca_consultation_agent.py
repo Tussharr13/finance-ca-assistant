@@ -100,7 +100,7 @@ class CAConsultationAgent:
 
         answer = self.pipeline.answer(user_message, top_k=top_k)
         return AgentResponse(
-            status="answered",
+            status=str(answer.answer.get("status", "abstained")),
             message=str(answer.answer.get("answer") or ""),
             profile_updates=updates,
             retrieved_sources=format_retrieval_results(answer.retrieved),
@@ -137,7 +137,7 @@ class CAConsultationAgent:
         answer = self.pipeline.answer(grounded_question, top_k=top_k)
         message = _build_advisory_message(answer.answer, profile)
         return AgentResponse(
-            status="answered",
+            status=str(answer.answer.get("status", "abstained")),
             message=message,
             profile_updates=profile_updates,
             retrieved_sources=format_retrieval_results(answer.retrieved),

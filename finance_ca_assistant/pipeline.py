@@ -175,10 +175,10 @@ class RAGPipeline:
             answer_generator=CAAnswerGenerator(llm=llm),
         )
 
-    def answer(self, question: str, top_k: int = 6) -> PipelineResponse:
+    def answer(self, question: str, top_k: int = 6, metadata_filter: Dict[str, Any] | None = None) -> PipelineResponse:
         """Retrieve relevant chunks and generate a structured CA answer."""
 
-        retrieved = self.retriever.retrieve(question, top_k=top_k)
+        retrieved = self.retriever.retrieve(question, top_k=top_k, metadata_filter=metadata_filter)
         answer = self.answer_generator.generate(question, [result.chunk for result in retrieved])
         return PipelineResponse(question=question, answer=answer, retrieved=retrieved)
 
@@ -200,10 +200,10 @@ class RAGPipeline:
             top_k=top_k,
         )
 
-    def retrieve_chunks(self, question: str, top_k: int = 6) -> List[Dict[str, Any]]:
+    def retrieve_chunks(self, question: str, top_k: int = 6, metadata_filter: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:
         """Return only retrieved chunk dictionaries for evaluation/API adapters."""
 
-        return [result.chunk for result in self.retriever.retrieve(question, top_k=top_k)]
+        return [result.chunk for result in self.retriever.retrieve(question, top_k=top_k, metadata_filter=metadata_filter)]
 
     def evaluate(self, questions: List[GoldenQuestion], top_k: int = 10) -> EvaluationReport:
         """Evaluate retrieval against golden questions."""

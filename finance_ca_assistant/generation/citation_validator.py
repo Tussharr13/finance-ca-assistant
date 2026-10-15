@@ -22,6 +22,20 @@ class CitationValidator:
     def __init__(self, min_overlap: float = 0.6) -> None:
         self.min_overlap = min_overlap
 
+    def validate_extract(self, claim: str, quote: str, cited_chunk: Dict[str, Any]) -> CitationValidationResult:
+        """Verify complete chunk attribution, never semantic truth or applicability."""
+        normalize = lambda value: " ".join(value.split())
+        source, page = cited_chunk.get("source"), cited_chunk.get("page")
+        if not isinstance(source, str) or not source.strip() or not isinstance(page, int) or isinstance(page, bool) or page < 1:
+            return CitationValidationResult(False, 0.0, "missing_source_or_page")
+        excerpt = normalize(quote)
+        if not excerpt or normalize(claim) != excerpt:
+            return CitationValidationResult(False, 0.0, "claim_must_equal_quote")
+        # Whole chunks avoid accepting a cropped phrase that drops a negation.
+        if excerpt != normalize(str(cited_chunk.get("text") or "")):
+            return CitationValidationResult(False, 0.0, "quote_must_equal_complete_chunk")
+        return CitationValidationResult(True, 1.0, "exact_extract_only")
+
     def validate_claim(self, claim: str, cited_chunk: Dict[str, Any]) -> CitationValidationResult:
         claim_tokens = _meaningful_tokens(claim)
         source_tokens = _meaningful_tokens(str(cited_chunk.get("text") or ""))
@@ -57,4 +71,3 @@ def _meaningful_tokens(text: str) -> set[str]:
         for token in re.findall(r"[a-zA-Z0-9]+", text.lower())
         if len(token) > 2 and token not in stopwords
     }
-

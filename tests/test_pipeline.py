@@ -11,7 +11,8 @@ def test_pipeline_answers_question_with_retrieval_trace(sample_chunks):
 
     assert response.retrieved[0].chunk["id"] == "tax-44"
     assert "clause" in response.retrieved[0].methods
-    assert response.answer["basis"]["primary_sources"][0]["document"] == sample_chunks[0]["source"]
+    assert response.answer["status"] == "abstained"
+    assert response.answer["basis"]["primary_sources"] == []
 
 
 def test_pipeline_evaluates_golden_questions(sample_chunks):

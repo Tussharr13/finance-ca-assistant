@@ -6,7 +6,7 @@ import math
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 @dataclass(frozen=True)
@@ -43,11 +43,18 @@ class BM25Index:
                 self.doc_freq[term] += 1
         self.avg_doc_len = (sum(lengths) / len(lengths)) if lengths else 0.0
 
-    def search(self, query: str, top_k: int) -> List[BM25Result]:
+    def search(self, query: str, top_k: int, metadata_filter: Optional[Dict[str, Any]] = None) -> List[BM25Result]:
+        if top_k <= 0:
+            return []
         query_terms = tokenize(query)
         scores = []
         total_docs = len(self.chunks)
         for index, terms in enumerate(self.doc_terms):
+            if metadata_filter and not all(
+                key in self.chunks[index] and self.chunks[index][key] == value
+                for key, value in metadata_filter.items()
+            ):
+                continue
             doc_len = sum(terms.values()) or 1
             score = 0.0
             for term in query_terms:
@@ -64,4 +71,3 @@ class BM25Index:
 
 def tokenize(text: str) -> List[str]:
     return re.findall(r"[a-zA-Z0-9]+(?:\([a-zA-Z0-9]+\))*", text.lower())
-
