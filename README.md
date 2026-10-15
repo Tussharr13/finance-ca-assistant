@@ -17,6 +17,11 @@ finance-ca-assistant/
 The outer folder uses hyphens because it is the project name. The inner package
 uses underscores because Python imports cannot use hyphens.
 
+## Decisions
+
+Every design and engineering decision, with its reasons and trade-offs, is
+logged in `decisionsForCA.md`. Add an entry with each change.
+
 ## Architecture and Roadmap
 
 The target product architecture, verified current state, known limitations, and
