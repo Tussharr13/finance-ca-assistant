@@ -160,23 +160,13 @@ def _infer_profile_updates(message: str) -> Dict[str, Any]:
     text = message.lower()
     updates: Dict[str, Any] = {}
 
-    salary_match = re.search(
-        r"(?:salary|ctc|earning|income)[^\d]{0,20}(\d+(?:\.\d+)?)\s*(lpa|lakhs?|lacs?|cr|crore|k|thousand)?",
-        text,
-    )
-    if salary_match:
-        amount = float(salary_match.group(1))
-        unit = salary_match.group(2) or ""
-        multiplier = 1.0
-        if unit in {"lpa", "lakh", "lakhs", "lac", "lacs"}:
-            multiplier = 100000.0
-        elif unit in {"cr", "crore"}:
-            multiplier = 10000000.0
-        elif unit in {"k", "thousand"}:
-            multiplier = 1000.0
-        updates["annual_salary_ctc"] = amount * multiplier
+    salary = _amount_after(r"(?<!other )(?<!rental )(?<!interest )\b(?:salary|ctc|earning|income)", text)
+    if salary is not None:
+        updates["annual_salary_ctc"] = salary
 
-    age_match = re.search(r"(?:age|aged)\s*(?:is)?\s*(\d{2})", text)
+    age_match = re.search(r"\b(?:age|aged)\s*(?:is)?\s*(\d{2})\b", text) or re.search(
+        r"\b(\d{2})\s*(?:years?|yrs?)\s*old\b", text
+    )
     if age_match:
         updates["age"] = int(age_match.group(1))
 
@@ -187,15 +177,116 @@ def _infer_profile_updates(message: str) -> Dict[str, Any]:
     elif "new regime" in text:
         updates["tax_regime_preference"] = "new"
 
-    if "resident" in text:
-        updates["residential_status"] = "resident"
-    elif "nri" in text or "non-resident" in text:
+    # Check the qualified statuses first: "resident" is a substring of both.
+    if re.search(r"\bnot ordinarily resident\b|\brnor\b", text):
+        updates["residential_status"] = "not-ordinarily-resident"
+    elif re.search(r"\bnon[- ]?resident\b|\bnri\b", text):
         updates["residential_status"] = "non-resident"
+    elif re.search(r"\bresident\b", text):
+        updates["residential_status"] = "resident"
 
-    if "rent" in text or "hra" in text:
-        updates["city"] = updates.get("city") or None
+    metro = next((city for city in _METRO_CITIES if re.search(rf"\b{city}\b", text)), None)
+    if re.search(r"\bnon[- ]?metro\b", text):
+        updates["city"] = "non-metro"
+    elif metro:
+        updates["city"] = metro
+    elif re.search(r"\bmetro\b", text):
+        updates["city"] = "metro"
+    else:
+        city_match = re.search(r"\b(?:live|living|based|stay|staying)\s+in\s+([a-z][a-z ]{1,30}?)(?=[,.;]|\s+and\b|$)", text)
+        if city_match:
+            updates["city"] = city_match.group(1).strip()
+
+    if re.search(r"\b(?:no|don'?t pay|do not pay|not paying)\s+rent\b", text):
+        updates["monthly_rent"] = 0.0
+    else:
+        rent = _amount_after(r"\brent\b(?!al)", text)
+        if rent is not None:
+            updates["monthly_rent"] = rent
+
+    if re.search(r"\bno\s+hra\b", text):
+        updates["hra_received"] = 0.0
+    else:
+        hra = _amount_after(r"\bhra\b", text)
+        if hra is not None:
+            updates["hra_received"] = hra
+
+    if re.search(r"\bno\s+(?:investments?|deductions?)\b", text):
+        updates["deductions_investments"] = "none"
+    else:
+        found = [label for label, pattern in _DEDUCTION_TERMS if re.search(pattern, text)]
+        if found:
+            updates["deductions_investments"] = ", ".join(found)
+
+    if re.search(r"\bno\s+(?:health|medical)\s+insurance\b|\bno\s+mediclaim\b", text):
+        updates["health_insurance"] = "none"
+    elif re.search(r"\b(?:health|medical)\s+insurance\b|\bmediclaim\b|\b80d\b", text):
+        updates["health_insurance"] = "yes"
+
+    if re.search(r"\bno\s+other\s+income\b", text):
+        updates["other_income"] = "none"
+    else:
+        found = [label for label, pattern in _OTHER_INCOME_TERMS if re.search(pattern, text)]
+        if found:
+            updates["other_income"] = ", ".join(found)
+
+    if re.search(r"\bform\s*-?\s*16\b|\bsalary slips?\b", text):
+        updates["employer_tds_or_form16"] = "available"
 
     return updates
+
+
+# Cities treated as metro for HRA exemption purposes.
+_METRO_CITIES = ("mumbai", "delhi", "kolkata", "chennai")
+
+_DEDUCTION_TERMS = (
+    ("EPF", r"\bepf\b|\bprovident fund\b"),
+    ("PPF", r"\bppf\b"),
+    ("ELSS", r"\belss\b"),
+    ("NPS", r"\bnps\b"),
+    ("80C", r"\b80c\b"),
+    ("life insurance", r"\blife insurance\b|\blic\b"),
+    ("tuition fees", r"\btuition\b"),
+    ("home loan", r"\bhome loan\b"),
+    ("donations", r"\bdonations?\b|\b80g\b"),
+)
+
+_OTHER_INCOME_TERMS = (
+    ("interest", r"\binterest\b"),
+    ("capital gains", r"\bcapital gains?\b"),
+    ("freelancing", r"\bfreelanc"),
+    ("rental income", r"\brental income\b"),
+    ("RSUs/ESOPs", r"\brsus?\b|\besops?\b"),
+)
+
+_AMOUNT_UNITS = {
+    "lpa": 100000.0, "lakh": 100000.0, "lakhs": 100000.0, "lac": 100000.0, "lacs": 100000.0,
+    "cr": 10000000.0, "crore": 10000000.0, "crores": 10000000.0,
+    "k": 1000.0, "thousand": 1000.0,
+}
+
+
+_AMOUNT_GAP = (
+    r"(?:[\s:=,.\-\u20b9]|\b(?:is|of|about|around|approx|roughly|rs|inr|my|i|get|paid|pay|"
+    r"received|receive|amount|was|annual|annually|monthly|yearly|per|month|year|package)\b)*?"
+)
+
+
+def _amount_after(label_pattern: str, text: str) -> Optional[float]:
+    """Parse an amount that follows a label, separated only by filler words.
+
+    Accepts Indian and Western digit grouping ("12,00,000", "1,200,000"). The
+    filler whitelist stops "salary slips and Form 16" from reading as 16.
+    """
+
+    match = re.search(
+        label_pattern + _AMOUNT_GAP + r"(\d[\d,]*(?:\.\d+)?)\s*(lpa|lakhs?|lacs?|crores?|cr|k|thousand)?\b",
+        text,
+    )
+    if not match:
+        return None
+    amount = float(match.group(1).replace(",", ""))
+    return amount * _AMOUNT_UNITS.get(match.group(2) or "", 1.0)
 
 
 def _missing_salary_tax_fields(profile: ClientProfile) -> List[str]:
