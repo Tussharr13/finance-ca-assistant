@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from finance_ca_assistant.retrieval.result_formatter import format_retrieval_results
 
@@ -20,7 +20,7 @@ class ClientProfile:
     tax_regime_preference: Optional[str] = None
     city: Optional[str] = None
     monthly_rent: Optional[float] = None
-    hra_received: Optional[float] = None
+    monthly_hra: Optional[float] = None
     deductions_investments: Optional[str] = None
     health_insurance: Optional[str] = None
     home_loan: Optional[str] = None
@@ -157,14 +157,15 @@ def _classify_topic(message: str) -> str:
 
 
 def _infer_profile_updates(message: str) -> Dict[str, Any]:
-    text = message.lower()
+    text = message.lower().replace("’", "'")
     updates: Dict[str, Any] = {}
 
-    salary = _amount_after(r"(?<!other )(?<!rental )(?<!interest )\b(?:salary|ctc|earning|income)", text)
+    salary = _amount_after(_SALARY_LABEL, text)
     if salary is not None:
-        updates["annual_salary_ctc"] = salary
+        amount, period = salary
+        updates["annual_salary_ctc"] = amount * 12 if period == "month" else amount
 
-    age_match = re.search(r"\b(?:age|aged)\s*(?:is)?\s*(\d{2})\b", text) or re.search(
+    age_match = re.search(r"\b(?:age|aged)\s*(?:is|:|=|-)?\s*(\d{2})\b", text) or re.search(
         r"\b(\d{2})\s*(?:years?|yrs?)\s*old\b", text
     )
     if age_match:
@@ -180,7 +181,7 @@ def _infer_profile_updates(message: str) -> Dict[str, Any]:
     # Check the qualified statuses first: "resident" is a substring of both.
     if re.search(r"\bnot ordinarily resident\b|\brnor\b", text):
         updates["residential_status"] = "not-ordinarily-resident"
-    elif re.search(r"\bnon[- ]?resident\b|\bnri\b", text):
+    elif re.search(r"\bnon[- ]?resident\b|\bnri\b|\bnot (?:an? )?(?:indian )?resident\b", text):
         updates["residential_status"] = "non-resident"
     elif re.search(r"\bresident\b", text):
         updates["residential_status"] = "resident"
@@ -193,44 +194,52 @@ def _infer_profile_updates(message: str) -> Dict[str, Any]:
     elif re.search(r"\bmetro\b", text):
         updates["city"] = "metro"
     else:
-        city_match = re.search(r"\b(?:live|living|based|stay|staying)\s+in\s+([a-z][a-z ]{1,30}?)(?=[,.;]|\s+and\b|$)", text)
-        if city_match:
-            updates["city"] = city_match.group(1).strip()
+        city_match = re.search(
+            r"\b(?:live|living|based|stay|staying)\s+in\s+([a-z]+(?: [a-z]+){0,2}?)"
+            r"(?=[,.;!?]|\s+(?:and|with|for|since|but|near|where|on|at)\b|$)",
+            text,
+        )
+        if city_match and city_match.group(1).split()[0] not in _NON_CITY_WORDS:
+            updates["city"] = city_match.group(1)
 
-    if re.search(r"\b(?:no|don'?t pay|do not pay|not paying)\s+rent\b", text):
+    if re.search(_NEGATION + r"rent\b", text):
         updates["monthly_rent"] = 0.0
     else:
-        rent = _amount_after(r"\brent\b(?!al)", text)
+        rent = _amount_after(r"\brent\b", text)
         if rent is not None:
-            updates["monthly_rent"] = rent
+            amount, period = rent
+            updates["monthly_rent"] = amount / 12 if period == "year" else amount
 
-    if re.search(r"\bno\s+hra\b", text):
-        updates["hra_received"] = 0.0
+    if re.search(_NEGATION + r"hra\b", text):
+        updates["monthly_hra"] = 0.0
     else:
         hra = _amount_after(r"\bhra\b", text)
         if hra is not None:
-            updates["hra_received"] = hra
+            amount, period = hra
+            updates["monthly_hra"] = amount / 12 if period == "year" else amount
 
-    if re.search(r"\bno\s+(?:investments?|deductions?)\b", text):
+    if re.search(_NEGATION + r"(?:investments?|deductions?)\b", text):
         updates["deductions_investments"] = "none"
     else:
         found = [label for label, pattern in _DEDUCTION_TERMS if re.search(pattern, text)]
         if found:
             updates["deductions_investments"] = ", ".join(found)
 
-    if re.search(r"\bno\s+(?:health|medical)\s+insurance\b|\bno\s+mediclaim\b", text):
+    if re.search(_NEGATION + r"(?:(?:health|medical)\s+insurance|mediclaim)\b", text):
         updates["health_insurance"] = "none"
     elif re.search(r"\b(?:health|medical)\s+insurance\b|\bmediclaim\b|\b80d\b", text):
         updates["health_insurance"] = "yes"
 
-    if re.search(r"\bno\s+other\s+income\b", text):
+    if re.search(_NEGATION + r"other\s+income\b", text):
         updates["other_income"] = "none"
     else:
         found = [label for label, pattern in _OTHER_INCOME_TERMS if re.search(pattern, text)]
         if found:
             updates["other_income"] = ", ".join(found)
 
-    if re.search(r"\bform\s*-?\s*16\b|\bsalary slips?\b", text):
+    if re.search(_NEGATION + r"(?:form\s*-?\s*16|salary slips?)\b", text):
+        updates["employer_tds_or_form16"] = "not available"
+    elif re.search(r"\bform\s*-?\s*16\b|\bsalary slips?\b", text):
         updates["employer_tds_or_form16"] = "available"
 
     return updates
@@ -238,6 +247,29 @@ def _infer_profile_updates(message: str) -> Dict[str, Any]:
 
 # Cities treated as metro for HRA exemption purposes.
 _METRO_CITIES = ("mumbai", "delhi", "kolkata", "chennai")
+
+# Words that start a "live in ..." phrase that is not a city ("live in a rented flat").
+_NON_CITY_WORDS = frozenset(
+    {"a", "an", "the", "my", "our", "his", "her", "their", "rented", "own", "pg", "hostel",
+     "house", "flat", "apartment", "india"}
+)
+
+# Prefix meaning "the client does not have/pay X"; append the thing being negated.
+_NEGATION = (
+    r"\b(?:no|without|(?:do not|don'?t|does not|doesn'?t|not|never)\s+(?:have|pay|get|receive|own)|"
+    r"(?:haven'?t|hasn'?t)(?:\s+got)?|not\s+paying|not\s+getting)\s+(?:any\s+)?(?:an?\s+)?"
+)
+
+# Words that, right before "income", mean the income is not salary.
+_NON_SALARY_INCOME_WORDS = (
+    "other", "rental", "interest", "freelance", "freelancing", "dividend", "business",
+    "professional", "consulting", "side", "passive", "gains", "property", "agricultural",
+)
+_SALARY_LABEL = (
+    r"\b(?:salary|ctc|earning|"
+    + "".join(f"(?<!{word} )" for word in _NON_SALARY_INCOME_WORDS)
+    + r"income)"
+)
 
 _DEDUCTION_TERMS = (
     ("EPF", r"\bepf\b|\bprovident fund\b"),
@@ -252,7 +284,8 @@ _DEDUCTION_TERMS = (
 )
 
 _OTHER_INCOME_TERMS = (
-    ("interest", r"\binterest\b"),
+    # Loan interest is a deduction, not income.
+    ("interest", r"(?<!loan )(?<!housing )(?<!emi )\binterest\b(?!\s+(?:paid|on\s+(?:my\s+)?(?:home\s+|housing\s+)?loan))"),
     ("capital gains", r"\bcapital gains?\b"),
     ("freelancing", r"\bfreelanc"),
     ("rental income", r"\brental income\b"),
@@ -260,33 +293,54 @@ _OTHER_INCOME_TERMS = (
 )
 
 _AMOUNT_UNITS = {
-    "lpa": 100000.0, "lakh": 100000.0, "lakhs": 100000.0, "lac": 100000.0, "lacs": 100000.0,
+    "lpa": 100000.0, "lakh": 100000.0, "lakhs": 100000.0, "lac": 100000.0, "lacs": 100000.0, "l": 100000.0,
     "cr": 10000000.0, "crore": 10000000.0, "crores": 10000000.0,
     "k": 1000.0, "thousand": 1000.0,
 }
 
-
+# Filler allowed between a label and its amount. Excludes "," and "." so the
+# match cannot run across clauses ("salary, 32 years old").
 _AMOUNT_GAP = (
-    r"(?:[\s:=,.\-\u20b9]|\b(?:is|of|about|around|approx|roughly|rs|inr|my|i|get|paid|pay|"
+    r"(?:[\s:=\-₹]|\brs\.?|\b(?:is|of|about|around|approx|roughly|inr|my|i|get|paid|pay|"
     r"received|receive|amount|was|annual|annually|monthly|yearly|per|month|year|package)\b)*?"
 )
 
+_MONTHLY = re.compile(r"\bmonthly\b|\bper\s+month\b|\bmonth\b|\bpm\b|/\s*month\b|\ba\s+month\b|\bp\.?m\.?(?!\w)")
+_YEARLY = re.compile(
+    r"\b(?:annual|annually|yearly|year|per\s+annum|pa|p\.a\.?|a\s+year|lpa)\b|/\s*(?:year|yr|annum)\b"
+)
 
-def _amount_after(label_pattern: str, text: str) -> Optional[float]:
+
+def _amount_after(label_pattern: str, text: str) -> Optional[Tuple[float, Optional[str]]]:
     """Parse an amount that follows a label, separated only by filler words.
 
-    Accepts Indian and Western digit grouping ("12,00,000", "1,200,000"). The
-    filler whitelist stops "salary slips and Form 16" from reading as 16.
+    Returns ``(amount, period)`` where period is "month", "year" or None when
+    the message does not say. Accepts Indian and Western digit grouping
+    ("12,00,000", "1,200,000"). The filler whitelist stops "salary slips and
+    Form 16" from reading as 16.
     """
 
     match = re.search(
-        label_pattern + _AMOUNT_GAP + r"(\d[\d,]*(?:\.\d+)?)\s*(lpa|lakhs?|lacs?|crores?|cr|k|thousand)?\b",
+        label_pattern + "(" + _AMOUNT_GAP + r")(\d[\d,]*(?:\.\d+)?)\s*(lpa|lakhs?|lacs?|crores?|cr|k|thousand|l)?\b",
         text,
     )
     if not match:
         return None
-    amount = float(match.group(1).replace(",", ""))
-    return amount * _AMOUNT_UNITS.get(match.group(2) or "", 1.0)
+    gap, digits, unit = match.group(1), match.group(2), match.group(3) or ""
+    amount = float(digits.replace(",", "")) * _AMOUNT_UNITS.get(unit, 1.0)
+    # The period can be the word right before the label ("monthly salary"), in
+    # the gap, or just after the amount ("1 lakh per month"). Stay within the
+    # clause so a neighbouring "20 lpa" or "per month" does not leak in.
+    word_before = re.search(r"\b(monthly|yearly|annual|annually)\s*$", text[:match.start()])
+    following = re.split(r"[,.;!?]", text[match.end():match.end() + 16], maxsplit=1)[0]
+    around = " ".join([word_before.group(1) if word_before else "", gap, unit, following])
+    if _MONTHLY.search(around):
+        period: Optional[str] = "month"
+    elif _YEARLY.search(around):
+        period = "year"
+    else:
+        period = None
+    return amount, period
 
 
 def _missing_salary_tax_fields(profile: ClientProfile) -> List[str]:
@@ -297,7 +351,7 @@ def _missing_salary_tax_fields(profile: ClientProfile) -> List[str]:
         "tax_regime_preference",
         "city",
         "monthly_rent",
-        "hra_received",
+        "monthly_hra",
         "deductions_investments",
         "health_insurance",
         "other_income",
@@ -314,7 +368,7 @@ def _questions_for_missing_fields(missing_fields: Sequence[str]) -> List[str]:
         "tax_regime_preference": "Are you currently opting for the new regime, old regime, or should we compare both?",
         "city": "Which city do you live in for HRA purposes: metro or non-metro?",
         "monthly_rent": "Do you pay rent? If yes, what is the monthly rent and do you have rent receipts/PAN of landlord where needed?",
-        "hra_received": "How much HRA does your salary structure show?",
+        "monthly_hra": "How much HRA does your salary structure show per month?",
         "deductions_investments": "What deductions or investments do you already have: EPF, PPF, ELSS, life insurance, tuition fees, NPS, donations, etc.?",
         "health_insurance": "Do you pay medical insurance premium for self, family, or parents?",
         "other_income": "Do you have other income such as interest, capital gains, freelancing, rent, or RSUs/ESOPs?",
