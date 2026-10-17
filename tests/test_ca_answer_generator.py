@@ -18,10 +18,11 @@ def claim(chunk):
     return {"text": chunk["text"], "quote": chunk["text"], "chunk_id": chunk["id"]}
 
 
-def test_valid_extract_does_not_render_unchecked_model_fields(sample_chunks):
+def test_valid_claim_does_not_render_unchecked_model_fields(sample_chunks):
     payload = {"claims": [claim(sample_chunks[0])], "answer": "UNSAFE", "risks": ["UNSAFE"], "ca_analysis": "UNSAFE", "basis": {"confidence": "high"}}
     result = CAAnswerGenerator(StubLLM(payload)).generate("question", sample_chunks)
-    assert result["status"] == "evidence_only"
+    assert result["status"] == "answered"
+    assert result["basis"]["evidence_status"] == "quotes_verified"
     assert result["basis"]["confidence"] == "not_assessed"
     assert result["basis"]["primary_sources"][0]["page"] == 221
     assert result["basis"]["primary_sources"][0]["quote"] == sample_chunks[0]["text"]
@@ -76,3 +77,83 @@ def test_echo_and_empty_context_never_claim_verified_evidence(sample_chunks):
         assert result["status"] == "abstained"
         assert result["basis"]["confidence"] == "not_assessed"
         assert result["basis"]["primary_sources"] == []
+
+
+LAW = {
+    "id": "law-1",
+    "source": "Income_Tax_Act.pdf",
+    "page": 12,
+    "text": (
+        "The deduction under this section is allowed to an individual. "
+        "No deduction shall be allowed for any premium paid in cash. "
+        "The aggregate amount shall not exceed 25000 rupees, except where the insured is a senior citizen. "
+        "Payment must be made in the previous year."
+    ),
+}
+
+
+def paraphrase(text, quote):
+    return {"text": text, "quote": quote, "chunk_id": LAW["id"]}
+
+
+def test_paraphrase_backed_by_complete_sentences_is_answered():
+    claims = [
+        paraphrase(
+            "A premium paid in cash gets no deduction.",
+            "No deduction shall be allowed for any premium paid in cash.",
+        ),
+        paraphrase(
+            "The total amount cannot exceed 25000 rupees, except for a senior citizen insured.",
+            "The aggregate amount shall not exceed 25000 rupees, except where the insured is a senior citizen.",
+        ),
+    ]
+    result = CAAnswerGenerator(StubLLM({"claims": claims})).generate("question", [LAW])
+    assert result["status"] == "answered", result["diagnostics"]
+    assert "[1] A premium paid in cash gets no deduction." in result["answer"]
+    assert 'Source: Income_Tax_Act.pdf, page 12: "No deduction shall be allowed' in result["answer"]
+    assert [source["page"] for source in result["basis"]["primary_sources"]] == [12, 12]
+
+
+def test_model_json_inside_prose_or_fences_is_read():
+    payload = '```json\n{"claims": [{"text": "A premium paid in cash gets no deduction.", ' \
+        '"quote": "No deduction shall be allowed for any premium paid in cash.", "chunk_id": "law-1"}]}\n```'
+    assert CAAnswerGenerator(StubLLM(payload)).generate("question", [LAW])["status"] == "answered"
+
+
+@pytest.mark.parametrize(
+    "claim, reason",
+    [
+        # Flipped meaning: the quote says "No deduction".
+        (paraphrase("A premium paid in cash gets a deduction.", "No deduction shall be allowed for any premium paid in cash."),
+         "negation_mismatch"),
+        # Dropped the senior-citizen exception.
+        (paraphrase("The total amount cannot exceed 25000 rupees.",
+                    "The aggregate amount shall not exceed 25000 rupees, except where the insured is a senior citizen."),
+         "dropped_qualifier"),
+        # Changed figure.
+        (paraphrase("The total amount cannot exceed 50000 rupees, except for senior citizens.",
+                    "The aggregate amount shall not exceed 25000 rupees, except where the insured is a senior citizen."),
+         "number_not_in_quote"),
+        # Quote starts mid-sentence, cropping the "No".
+        (paraphrase("Deduction shall be allowed for premium paid in cash.", "deduction shall be allowed for any premium paid in cash."),
+         "quote_not_complete_sentences_from_chunk"),
+        # Quote not in the chunk.
+        (paraphrase("Premiums are always deductible.", "Premiums are always deductible."),
+         "quote_not_complete_sentences_from_chunk"),
+        # Claim unrelated to its quote.
+        (paraphrase("Home loan principal qualifies for a separate benefit.", "Payment must be made in the previous year."),
+         "insufficient_overlap_with_quote"),
+    ],
+)
+def test_unfaithful_claims_abstain(claim, reason):
+    result = CAAnswerGenerator(StubLLM({"claims": [claim]})).generate("question", [LAW])
+    assert result["status"] == "abstained"
+    assert result["diagnostics"]["citation_errors"] == [f"claim_0:{reason}"]
+
+
+def test_quotes_longer_than_three_sentences_are_rejected():
+    sentences = LAW["text"]
+    claim = paraphrase("The deduction is allowed to an individual, not for cash premiums, up to 25000 rupees except "
+                       "senior citizens, paid in the previous year.", sentences)
+    result = CAAnswerGenerator(StubLLM({"claims": [claim]})).generate("question", [LAW])
+    assert result["diagnostics"]["citation_errors"] == ["claim_0:quote_not_complete_sentences_from_chunk"]

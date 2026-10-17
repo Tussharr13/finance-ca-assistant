@@ -16,7 +16,7 @@ decision is reversed, add a new entry and mark the old one **Superseded by D-xx*
 | [D-01](#d-01-kaggle-is-the-runtime-the-repo-is-the-source-of-truth) | 2026-07-07 | Kaggle is the runtime, the repo is the source of truth | Accepted |
 | [D-02](#d-02-hugging-face-first-model-stack) | 2026-07-07 | Hugging Face-first model stack | Accepted |
 | [D-03](#d-03-bounded-cached-corpus-builds-on-kaggle) | 2026-07-12 | Bounded, cached corpus builds on Kaggle | Accepted |
-| [D-04](#d-04-answers-are-exact-extracts-or-abstain) | 2026-10-16 | Answers are exact extracts or abstain | Accepted for general questions; consultations use D-23 |
+| [D-04](#d-04-answers-are-exact-extracts-or-abstain) | 2026-10-16 | Answers are exact extracts or abstain | Superseded by D-25 |
 | [D-05](#d-05-weighted-reciprocal-rank-fusion-for-hybrid-search) | 2026-10-16 | Weighted reciprocal rank fusion for hybrid search | Accepted |
 | [D-06](#d-06-metadata-filters-apply-before-candidate-limits) | 2026-10-16 | Metadata filters apply before candidate limits | Accepted |
 | [D-07](#d-07-rule-based-client-fact-parsing-for-now) | 2026-10-16 | Rule-based client fact parsing, for now | Accepted |
@@ -37,6 +37,7 @@ decision is reversed, add a new entry and mark the old one **Superseded by D-xx*
 | [D-22](#d-22-follow-up-answers-continue-the-consultation) | 2026-10-16 | Follow-up answers continue the consultation | Accepted |
 | [D-23](#d-23-typed-claims-explain-the-calculation-never-replace-it) | 2026-10-16 | Typed claims explain the calculation, never replace it | Accepted |
 | [D-24](#d-24-numbers-in-claims-must-match-cited-evidence) | 2026-10-16 | Numbers in claims must match cited evidence | Accepted |
+| [D-25](#d-25-general-answers-are-paraphrases-backed-by-whole-sentence-quotes) | 2026-10-17 | General answers are paraphrases backed by whole-sentence quotes | Accepted |
 
 ---
 
@@ -114,7 +115,7 @@ the size of the fine-tuning data (D-14).
 
 ## D-04 Answers are exact extracts or abstain
 
-**Date:** 2026-10-16 · **Status:** Accepted, to be superseded by D-09 ·
+**Date:** 2026-10-16 · **Status:** Superseded by D-25 ·
 **Commit:** `ec13098` · **Detail:** `docs/citation-enforcement.md`
 
 **Context.** The earlier generator forwarded free-form model text with a
@@ -585,3 +586,42 @@ check code can do exactly.
 
 **Trade-offs.** Strict: a correct but uncited figure (for example a slab rate) is
 rejected. Adding rates as evidence would allow them.
+
+---
+
+## D-25 General answers are paraphrases backed by whole-sentence quotes
+
+**Date:** 2026-10-17 · **Status:** Accepted · **Supersedes:** D-04 ·
+**Detail:** `docs/citation-enforcement.md`
+
+**Context.** D-04 made the model copy whole chunks verbatim. Small models rarely
+manage that, so general questions ("What does SA 500 say?") almost always
+abstained, and copying chunks cost many output tokens. D-04's real concern was
+that a cropped quote could drop "No".
+
+**Decision.** Each claim is a plain-English `text` plus a verbatim `quote` of 1–3
+complete consecutive sentences from one chunk. Accepted only if: the quote is
+sentence-aligned in the chunk; negation presence matches; a condition in the
+quote (except, unless, provided that, subject to, only if, other than) is kept;
+every number in the text is in the quote; at least half of the text's key words
+are in the quote. **One failed claim abstains the whole answer**, as in D-04.
+
+**Why.** Sentence alignment solves the cropping problem directly, without
+demanding whole chunks. Paraphrase lets the model answer the question asked.
+Fail-closed stays because there is no calculator underneath general answers
+(contrast D-23, where single claims are dropped).
+
+**Implemented.** `CitationValidator.validate_quoted_claim`, the rewritten
+`CAAnswerGenerator` (status `answered`, policy `quoted_claims_v1`, at most 6 claims,
+JSON accepted inside prose or code fences), new prompt rules. Each displayed
+statement carries document, page and quote. `validate_extract` was removed.
+
+**Trade-offs.**
+- The checks are lexical. "may" → "must", or a changed subject, can pass.
+- Legal sentences are long; quoting three can still be token-heavy.
+- Sentence splitting on `. ! ? ; :` misreads abbreviations ("Sec. 80C") as
+  boundaries, which makes alignment more permissive around them.
+- Real-model acceptance rate is unmeasured.
+
+**Revisit when.** Kaggle runs show the acceptance rate and the rejection reasons;
+consider an NLI (entailment) model as an extra check for meaning shifts.

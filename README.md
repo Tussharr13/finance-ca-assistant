@@ -109,7 +109,9 @@ small stack is stable on the selected Kaggle GPU.
 ## Backend retrieval behavior
 
 Answer generation enforces the [citation contract](docs/citation-enforcement.md).
-It returns exact attributed extracts or abstains; confidence is `not_assessed`.
+Each statement is a paraphrase backed by a verbatim quote of complete sentences;
+code checks negations, conditions, numbers and wording against the quote, and any
+failed statement makes the answer abstain. Confidence is `not_assessed`.
 Default EchoLLM runs still retrieve evidence but abstain from generating answers.
 
 Hybrid search uses weighted reciprocal rank fusion (`weight / (60 + rank)`)
