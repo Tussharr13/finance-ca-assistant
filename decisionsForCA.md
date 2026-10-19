@@ -625,3 +625,109 @@ statement carries document, page and quote. `validate_extract` was removed.
 
 **Revisit when.** Kaggle runs show the acceptance rate and the rejection reasons;
 consider an NLI (entailment) model as an extra check for meaning shifts.
+
+---
+
+## D-26 Web chat: FastAPI server, Next.js client, streaming over POST
+
+**Date:** 2026-10-19 · **Status:** Accepted
+
+**Context.** The assistant only ran inside the Kaggle notebook. Users need a chat
+interface like ChatGPT or Claude; web first, mobile later.
+
+**Decision.** A FastAPI server (`server/`) wraps the existing pipeline. A Next.js
+15 + React 19 client (`web/`) renders it: a sidebar of chats grouped by date,
+Markdown with tables, status chips, collapsible sources and copy. A message is a
+`POST` whose response is a Server-Sent Events stream (`user_message`, `status`,
+`assistant_message`, `error`, `done`). The pipeline loads lazily on first use.
+
+**Why.** The Python pipeline stays the single source of truth, and the client
+has no tax logic. SSE over POST lets the message body carry the text, needs no
+WebSocket, and leaves room to stream tokens later. Next.js is a common default
+for a mobile client to share types and API code with later.
+
+**Implemented.** `server/app.py` (`create_app`, health, conversation CRUD,
+message stream, a failure reply plus `error` event when a turn raises),
+`server/pipeline_loader.py`, `web/` (ChatApp, Sidebar, MessageView, Composer,
+EmptyState, `lib/api.ts` SSE parser). `AgentResponse.sources` and
+`source_payloads` give the client structured sources. `tests/test_server.py`.
+
+**Trade-offs.**
+- Replies arrive whole, not token by token: the calculator path has nothing to
+  stream, and claim validation needs the full LLM output before anything shows.
+  The stream carries status steps only.
+- No authentication or rate limits. Local use only until they exist.
+- Two runtimes (Python and Node) to run and deploy.
+- Light and dark follow the OS setting, with no in-app toggle.
+
+**Revisit when.** Users other than the developer use it (add auth), or the LLM
+path makes waits long enough that token streaming is worth the validation work.
+
+---
+
+## D-27 Client profile lives on the server, per conversation
+
+**Date:** 2026-10-19 · **Status:** Accepted
+
+**Context.** The consultation agent (D-19, D-22) needs facts from earlier turns.
+In the notebook the caller passes `profile_updates` back each turn.
+
+**Decision.** Each conversation row stores the merged profile as JSON. On every
+turn the server passes it to `consult` and merges the returned updates.
+
+**Why.** The client stays thin and can't drop or tamper with facts between
+turns; reopening a chat on another device continues the same consultation.
+
+**Trade-offs.** The profile is invisible in the UI, so a user can't see or
+correct a fact the regex parser (D-07) misread except by restating it. Personal
+financial data now sits in a local SQLite file (`data/server/`, git-ignored).
+
+**Revisit when.** Adding a "facts used" panel with edit, or real user accounts.
+
+---
+
+## D-28 SQLite store with one locked connection
+
+**Date:** 2026-10-19 · **Status:** Accepted
+
+**Context.** Chats need to persist across restarts. D-10 targets Postgres for
+production; local development should need nothing installed.
+
+**Decision.** `ConversationStore` uses one `sqlite3` connection opened with
+`check_same_thread=False`, and **every statement, reads included, holds one
+`threading.Lock`**.
+
+**Why.** The first version locked only writes. When a page load fired parallel
+requests (conversation list, chat detail, health), FastAPI ran the reads on
+several pool threads over the shared connection and the process segfaulted
+(exit 139, no traceback). Locking reads fixed it: three runs of 3,000 parallel
+requests with no errors. `test_store_survives_concurrent_reads_and_writes`
+crashes without the fix and passes with it.
+
+**Trade-offs.** All database access is serialised. Queries take microseconds
+here, so it's not a bottleneck for one user; per-thread connections with WAL
+would allow parallel reads at the cost of more code.
+
+**Revisit when.** Moving to Postgres (D-10), or many concurrent users.
+
+---
+
+## D-29 Server runs without a knowledge base
+
+**Date:** 2026-10-19 · **Status:** Accepted
+
+**Context.** The knowledge base and fine-tuned model are produced on Kaggle and
+may not be on the developer's machine.
+
+**Decision.** With no `FINANCE_CA_ARTIFACTS_DIR`, the server starts on an empty
+corpus: calculations work, general questions abstain, and `/api/health` reports
+0 chunks so the UI shows a banner. The hash embedding provider returns an empty
+matrix for no rows. With artifacts, the loader uses the adopted fine-tuned model
+(D-17) if present, else `BAAI/bge-small-en-v1.5`, and re-embeds if the stored
+embeddings don't match.
+
+**Why.** The calculator path is the most useful part and needs no artifacts; the
+UI can be built and tested without a Kaggle download.
+
+**Trade-offs.** A misconfigured path quietly gives a calculator-only assistant;
+the banner is the only signal.

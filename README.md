@@ -8,6 +8,8 @@ Kaggle-first MVP for a Chartered Accountant domain RAG assistant.
 finance-ca-assistant/
   finance_ca_assistant/   # Python package, importable with underscores
   notebooks/              # Kaggle MVP notebook
+  server/                 # FastAPI chat API (SQLite, streaming replies)
+  web/                    # Next.js chat interface
   scripts/                # Local smoke/test helpers
   tests/                  # Focused unit tests
   requirements.txt
@@ -186,3 +188,29 @@ next turn. Once the facts are complete, the reply has status `calculated` and is
 built from the regime calculator, not the LLM: both regimes side by side, the
 deductions applied with their sections, assumptions, and what is not included.
 The full result is on `consultation.calculation`.
+
+## Web Chat
+
+A ChatGPT-style chat interface: `server/` (FastAPI) and `web/` (Next.js).
+
+```bash
+# API on :8000 (from the project root)
+pip install -r server/requirements.txt
+python3 -m uvicorn server.app:create_app --factory --port 8000
+
+# Web on :3000
+cd web && npm install && npm run dev
+```
+
+Without artifacts the server runs calculator-only: regime calculations work,
+questions about standards and law abstain, and the UI shows a banner. To answer
+from the knowledge base, download the Kaggle output and set
+`FINANCE_CA_ARTIFACTS_DIR` to the folder holding `chunks.jsonl` (and the
+adopted fine-tuned model, if any). Other settings: `FINANCE_CA_LLM_MODEL` (a
+Hugging Face model id, for written answers), `FINANCE_CA_EMBED_DEVICE`,
+`FINANCE_CA_DB` (default `data/server/chat.sqlite3`),
+`FINANCE_CA_WEB_ORIGINS` (CORS, default `http://localhost:3000`), and
+`NEXT_PUBLIC_API_URL` in `web/` (default `http://localhost:8000`).
+
+Each conversation keeps its client profile on the server, so facts given in
+earlier messages carry into later calculations.

@@ -48,6 +48,8 @@ class DeterministicHashEmbeddingProvider(EmbeddingProvider):
                 vector[index] += sign
             norm = np.linalg.norm(vector)
             rows.append(vector / norm if norm else vector)
+        if not rows:
+            return np.empty((0, self.dimensions), dtype=np.float32)
         return np.vstack(rows).astype(np.float32)
 
 

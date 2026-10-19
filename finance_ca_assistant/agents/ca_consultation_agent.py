@@ -16,7 +16,7 @@ from finance_ca_assistant.generation.typed_claims import (
     render_claims,
     validate_claims,
 )
-from finance_ca_assistant.retrieval.result_formatter import format_retrieval_results
+from finance_ca_assistant.retrieval.result_formatter import format_retrieval_results, source_payloads
 
 # Used when the client does not name a year. Planning for a later year must
 # wait until that year's rules are verified (see decisionsForCA.md D-12).
@@ -86,6 +86,8 @@ class AgentResponse:
     questions: List[str] = field(default_factory=list)
     profile_updates: Dict[str, Any] = field(default_factory=dict)
     retrieved_sources: str = ""
+    # The same retrieval results as structured entries, for API clients.
+    sources: List[Dict[str, Any]] = field(default_factory=list)
     answer: Optional[Dict[str, Any]] = None
     calculation: Optional[RegimeComparison] = None
     # Typed-claims explanation diagnostics: accepted/rejected claims or an error.
@@ -139,6 +141,7 @@ class CAConsultationAgent:
             message=str(answer.answer.get("answer") or ""),
             profile_updates=updates,
             retrieved_sources=format_retrieval_results(answer.retrieved),
+            sources=source_payloads(answer.retrieved),
             answer=answer.answer,
         )
 
@@ -157,6 +160,7 @@ class CAConsultationAgent:
         )
         retrieved = self.pipeline.retriever.retrieve(retrieval_query, top_k=top_k)
         retrieved_sources = format_retrieval_results(retrieved)
+        sources = source_payloads(retrieved)
 
         if missing_fields:
             questions = _questions_for_missing_fields(missing_fields)
@@ -167,6 +171,7 @@ class CAConsultationAgent:
                 questions=questions,
                 profile_updates=profile_updates,
                 retrieved_sources=retrieved_sources,
+                sources=sources,
             )
 
         tax_input, assumptions = _salary_tax_input(profile)
@@ -181,6 +186,7 @@ class CAConsultationAgent:
                 ),
                 profile_updates=profile_updates,
                 retrieved_sources=retrieved_sources,
+                sources=sources,
             )
         message = _build_calculation_message(comparison, assumptions, profile)
         explanation = self._explain_calculation(user_message, profile, comparison, [r.chunk for r in retrieved])
@@ -191,6 +197,7 @@ class CAConsultationAgent:
             message=message,
             profile_updates=profile_updates,
             retrieved_sources=retrieved_sources,
+            sources=sources,
             calculation=comparison,
             explanation=explanation,
         )

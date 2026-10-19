@@ -31,3 +31,5 @@ finance_ca_assistant_artifacts*/
 finance-ca-assistant.zip
 
 .ipynb_checkpoints/
+# Local chat server database
+data/server/
