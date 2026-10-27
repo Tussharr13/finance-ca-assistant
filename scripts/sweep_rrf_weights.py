@@ -1,6 +1,10 @@
 """Grid-search the hybrid RRF weights against the golden retrieval set.
 
     python3 scripts/sweep_rrf_weights.py --artifacts /path/to/kaggle/artifacts
+    python3 scripts/sweep_rrf_weights.py --artifacts ... --held-out   # two-fold check
+
+--held-out tunes on one half of the golden set, scores that choice on the other
+half, and compares it with the current defaults. Writes rrf_holdout.{md,json}.
 
 Only the hybrid channel changes between configurations; dense, BM25 and clause
 rankings are fixed, so query embeddings are computed once and reused. Every
@@ -130,8 +134,70 @@ def render(result: Dict[str, Any], top: int) -> str:
     return "\n".join(lines) + "\n"
 
 
+def split_halves(questions) -> Tuple[List[Any], List[Any]]:
+    """Two folds by sorted question ID, so the split is stable across runs."""
+    ordered = sorted(questions, key=lambda question: question.id)
+    return ordered[0::2], ordered[1::2]
+
+
+def _best(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Highest page MRR@10; ties go to higher page recall@1, then the earlier row."""
+    return max(rows, key=lambda row: (row["metrics"]["page_mrr@10"] or 0.0, row["metrics"]["page_recall@1"] or 0.0))
+
+
+def held_out(pipeline, questions, corpus_sources, corpus_pages, grid=None) -> Dict[str, Any]:
+    """Two-fold check: choose weights on one half, score them on the other half.
+
+    Each fold's chosen configuration is compared with the current defaults on
+    questions it never saw. A gain only counts if it holds on both folds.
+    """
+    folds = []
+    for tune_half, test_half in (split_halves(questions), split_halves(questions)[::-1]):
+        tuned = sweep(pipeline, tune_half, corpus_sources, corpus_pages, grid=grid)
+        chosen = _best(tuned["configurations"])
+        w = chosen["weights"]
+        chosen_test = score_config(pipeline, test_half, corpus_sources, corpus_pages,
+                                   (w["dense"], w["bm25"], w["clause"]), chosen["rrf_k"])
+        default_test = score_config(pipeline, test_half, corpus_sources, corpus_pages,
+                                    (DEFAULT_WEIGHTS["dense"], DEFAULT_WEIGHTS["bm25"], DEFAULT_WEIGHTS["clause"]),
+                                    DEFAULT_RRF_K)
+        folds.append({
+            "tuned_on": len(tune_half),
+            "tested_on": len(test_half),
+            "chosen": {"weights": w, "rrf_k": chosen["rrf_k"], "tune_metrics": chosen["metrics"]},
+            "held_out": {
+                "chosen": {name: chosen_test.get(name) for name in REPORT_METRICS},
+                "default": {name: default_test.get(name) for name in REPORT_METRICS},
+            },
+        })
+    return {"folds": folds}
+
+
+def render_held_out(result: Dict[str, Any]) -> str:
+    lines = ["# Held-out RRF check", "",
+             "Weights chosen on one half of the golden set, scored on the other half (two folds).", ""]
+    for index, fold in enumerate(result["folds"], start=1):
+        w = fold["chosen"]["weights"]
+        lines += [
+            f"## Fold {index}: tuned on {fold['tuned_on']}, tested on {fold['tested_on']}",
+            "",
+            f"Chosen: dense {w['dense']}, BM25 {w['bm25']}, clause {w['clause']}, rrf_k {fold['chosen']['rrf_k']}",
+            "",
+            "| set | " + " | ".join(REPORT_METRICS) + " |",
+            "|" + "---|" * (1 + len(REPORT_METRICS)),
+        ]
+        for label, metrics in (("held-out, chosen", fold["held_out"]["chosen"]),
+                               ("held-out, default", fold["held_out"]["default"])):
+            cells = " | ".join(f"{metrics[name]:.3f}" if metrics[name] is not None else "-" for name in REPORT_METRICS)
+            lines.append(f"| {label} | {cells} |")
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--held-out", action="store_true",
+                        help="Run the two-fold held-out check instead of the full sweep table")
     parser.add_argument("--artifacts", default=os.environ.get("FINANCE_CA_ARTIFACTS_DIR"),
                         help="Folder with chunks.jsonl / embeddings_cache.npz (default: $FINANCE_CA_ARTIFACTS_DIR)")
     parser.add_argument("--golden", default=str(ROOT / "data" / "golden_testset.json"))
@@ -148,9 +214,17 @@ def main() -> int:
     sources = sorted({str(chunk.get("source")) for chunk in chunks})
     pages = sorted({page_key(chunk.get("source"), chunk.get("page")) for chunk in chunks})
 
-    result = sweep(loaded.pipeline, questions, sources, pages)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    if args.held_out:
+        held = held_out(loaded.pipeline, questions, sources, pages)
+        (out_dir / "rrf_holdout.json").write_text(json.dumps(held, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        markdown = render_held_out(held)
+        (out_dir / "rrf_holdout.md").write_text(markdown, encoding="utf-8")
+        print(markdown)
+        return 0
+
+    result = sweep(loaded.pipeline, questions, sources, pages)
     (out_dir / "rrf_sweep.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     markdown = render(result, args.top)
     (out_dir / "rrf_sweep.md").write_text(markdown, encoding="utf-8")
