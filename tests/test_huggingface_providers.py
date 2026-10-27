@@ -36,6 +36,19 @@ def test_sentence_transformer_embedding_provider_uses_injected_model():
     assert embeddings.shape == (2, 3)
 
 
+class FakeSizedSentenceTransformer(FakeSentenceTransformer):
+    def get_sentence_embedding_dimension(self):
+        return 3
+
+
+def test_provider_dimensions_come_from_the_model_before_any_text_is_embedded():
+    # Saved artifacts are checked against ``dimensions`` on load, so a wrong
+    # default (1024 for a 384-dimension model) would force a needless re-embed.
+    provider = SentenceTransformerEmbeddingProvider(model=FakeSizedSentenceTransformer(), dimensions=1024)
+
+    assert provider.dimensions == 3
+
+
 def test_embedding_factory_creates_bge_m3_provider_with_injected_model():
     provider = create_embedding_provider("bge-m3", model=FakeSentenceTransformer(), dimensions=3)
 

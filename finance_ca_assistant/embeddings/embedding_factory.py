@@ -71,10 +71,12 @@ class SentenceTransformerEmbeddingProvider(EmbeddingProvider):
         device: Optional[str] = None,
     ) -> None:
         self.model_name = model_name
-        self.dimensions = dimensions
         self.batch_size = batch_size
         self.normalize_embeddings = normalize_embeddings
         self.model = model or self._load_model(model_name=model_name, device=device)
+        # Trust the loaded model over the caller's guess: saved artifacts are
+        # compared against ``dimensions`` before any text is embedded.
+        self.dimensions = self._model_dimensions(self.model) or dimensions
 
     def embed_texts(self, texts: Iterable[str]) -> np.ndarray:
         batch = [" ".join(str(text).split()) or " " for text in texts]
@@ -94,6 +96,17 @@ class SentenceTransformerEmbeddingProvider(EmbeddingProvider):
             raise ValueError("sentence-transformers encode() must return a 2D embedding matrix")
         self.dimensions = int(matrix.shape[1])
         return matrix
+
+    @staticmethod
+    def _model_dimensions(model: object) -> Optional[int]:
+        getter = getattr(model, "get_sentence_embedding_dimension", None)
+        if getter is None:
+            return None
+        try:
+            value = getter()
+        except Exception:  # pragma: no cover - defensive against third-party models
+            return None
+        return int(value) if value else None
 
     @staticmethod
     def _load_model(model_name: str, device: Optional[str] = None) -> object:
