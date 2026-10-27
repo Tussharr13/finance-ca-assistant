@@ -149,6 +149,7 @@ The gate exits 1 if a hybrid quality metric falls more than 0.02 below
 `data/retrieval_baseline.json`. Questions whose source, or whose labelled pages,
 are not in the loaded corpus are skipped and listed, so a bounded build is not
 read as a retrieval failure. Reports go to `data/benchmark/` (git-ignored).
+Notebook Section 6.1 runs the same gate on Kaggle.
 
 ## Retrieval Fine-tuning
 

@@ -88,7 +88,8 @@ python3 scripts/benchmark_retrieval.py --artifacts /tmp/ca-artifacts
 
 The gate must pass before any retrieval change is committed (D-30). Rewrite the
 baseline with `--write-baseline` only when the golden set changes, and say so in
-the commit.
+the commit. On Kaggle, notebook Section 6.1 runs the same gate on the Section 4
+pipeline; the user's notebook is `kaggle.com/code/tussharsingh13/yourca`.
 
 ## Kaggle workflow
 
