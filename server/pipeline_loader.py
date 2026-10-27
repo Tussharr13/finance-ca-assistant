@@ -34,14 +34,19 @@ class LoadedPipeline:
 
 
 def load_pipeline_from_env() -> LoadedPipeline:
-    llm_model = os.environ.get("FINANCE_CA_LLM_MODEL") or None
+    return load_pipeline(
+        os.environ.get("FINANCE_CA_ARTIFACTS_DIR") or None,
+        os.environ.get("FINANCE_CA_LLM_MODEL") or None,
+    )
+
+
+def load_pipeline(artifacts: Optional[str], llm_model: Optional[str] = None) -> LoadedPipeline:
     llm = None
     if llm_model:
         from finance_ca_assistant.generation.llm_factory import create_llm
 
         llm = create_llm("huggingface", model_name=llm_model)
 
-    artifacts = os.environ.get("FINANCE_CA_ARTIFACTS_DIR")
     if not artifacts:
         logger.warning("FINANCE_CA_ARTIFACTS_DIR not set: running calculator-only with no knowledge base")
         return LoadedPipeline(RAGPipeline.from_chunks([], llm=llm), "none", llm_model)

@@ -1,0 +1,410 @@
+{
+  "corpus": {
+    "chunks": 188,
+    "detail": "188 chunks (BAAI/bge-small-en-v1.5, saved embeddings)",
+    "pages": 63,
+    "sources": [
+      "CGST_Rules_2017_CBIC.pdf",
+      "ICAI_AS_1_Accounting_Policies.pdf",
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ]
+  },
+  "golden_ids": [
+    "accounting_001",
+    "accounting_002",
+    "accounting_003",
+    "accounting_004",
+    "accounting_005",
+    "accounting_006",
+    "accounting_007",
+    "accounting_008",
+    "accounting_009",
+    "audit_001",
+    "gst_001",
+    "gst_002",
+    "gst_003",
+    "gst_004",
+    "gst_005",
+    "gst_006",
+    "gst_007",
+    "gst_008",
+    "gst_009",
+    "gst_010",
+    "gst_011",
+    "gst_012",
+    "gst_013",
+    "gst_014",
+    "gst_015",
+    "gst_016",
+    "gst_017",
+    "gst_018",
+    "gst_019",
+    "gst_020",
+    "gst_021",
+    "gst_022",
+    "gst_023",
+    "gst_024",
+    "gst_025",
+    "gst_026",
+    "gst_027",
+    "gst_028",
+    "gst_029",
+    "gst_030",
+    "tax_audit_001",
+    "tax_audit_002",
+    "tax_audit_003",
+    "tax_audit_004",
+    "tax_audit_005",
+    "tax_audit_006",
+    "tax_audit_007",
+    "tax_audit_008",
+    "tax_audit_009",
+    "tax_audit_010",
+    "tax_audit_011",
+    "tax_audit_012"
+  ],
+  "hybrid_by_category": {
+    "accounting": {
+      "page_mrr@10": 1.0,
+      "page_recall@1": 1.0,
+      "page_recall@10": 1.0,
+      "page_recall@5": 1.0,
+      "section_recall@1": 0.1111111111111111,
+      "section_recall@10": 0.8888888888888888,
+      "section_recall@5": 0.6666666666666666,
+      "source_mrr@10": 1.0,
+      "source_recall@1": 1.0,
+      "source_recall@10": 1.0,
+      "source_recall@5": 1.0
+    },
+    "gst": {
+      "page_mrr@10": 0.8805555555555554,
+      "page_recall@1": 0.8,
+      "page_recall@10": 1.0,
+      "page_recall@5": 1.0,
+      "section_recall@1": 0.375,
+      "section_recall@10": 0.75,
+      "section_recall@5": 0.625,
+      "source_mrr@10": 1.0,
+      "source_recall@1": 1.0,
+      "source_recall@10": 1.0,
+      "source_recall@5": 1.0
+    },
+    "tax_audit": {
+      "page_mrr@10": 0.7090909090909091,
+      "page_recall@1": 0.5454545454545454,
+      "page_recall@10": 1.0,
+      "page_recall@5": 0.9090909090909091,
+      "source_mrr@10": 1.0,
+      "source_recall@1": 1.0,
+      "source_recall@10": 1.0,
+      "source_recall@5": 1.0
+    }
+  },
+  "methods": {
+    "bm25": {
+      "latency_ms": {
+        "p50": 1.0854374999995642,
+        "p95": 3.4549579999989533
+      },
+      "metrics": {
+        "page_mrr@10": 0.8839999999999999,
+        "page_recall@1": 0.8,
+        "page_recall@10": 1.0,
+        "page_recall@5": 1.0,
+        "section_recall@1": 0.17647058823529413,
+        "section_recall@10": 0.7647058823529411,
+        "section_recall@5": 0.5294117647058824,
+        "source_mrr@10": 1.0,
+        "source_recall@1": 1.0,
+        "source_recall@10": 1.0,
+        "source_recall@5": 1.0
+      }
+    },
+    "clause": {
+      "latency_ms": {
+        "p50": 0.01645850000020488,
+        "p95": 0.05420900000174811
+      },
+      "metrics": {
+        "page_mrr@10": 0.025,
+        "page_recall@1": 0.02,
+        "page_recall@10": 0.04,
+        "page_recall@5": 0.04,
+        "section_recall@1": 0.058823529411764705,
+        "section_recall@10": 0.058823529411764705,
+        "section_recall@5": 0.058823529411764705,
+        "source_mrr@10": 0.14,
+        "source_recall@1": 0.14,
+        "source_recall@10": 0.14,
+        "source_recall@5": 0.14
+      }
+    },
+    "dense": {
+      "latency_ms": {
+        "p50": 27.551395499999742,
+        "p95": 104.35741599999915
+      },
+      "metrics": {
+        "page_mrr@10": 0.8225238095238094,
+        "page_recall@1": 0.76,
+        "page_recall@10": 0.96,
+        "page_recall@5": 0.92,
+        "section_recall@1": 0.17647058823529413,
+        "section_recall@10": 0.8235294117647058,
+        "section_recall@5": 0.7647058823529411,
+        "source_mrr@10": 1.0,
+        "source_recall@1": 1.0,
+        "source_recall@10": 1.0,
+        "source_recall@5": 1.0
+      }
+    },
+    "hybrid": {
+      "latency_ms": {
+        "p50": 26.181145499999836,
+        "p95": 106.09037500000085
+      },
+      "metrics": {
+        "page_mrr@10": 0.8643333333333334,
+        "page_recall@1": 0.78,
+        "page_recall@10": 1.0,
+        "page_recall@5": 0.98,
+        "section_recall@1": 0.23529411764705882,
+        "section_recall@10": 0.8235294117647058,
+        "section_recall@5": 0.6470588235294118,
+        "source_mrr@10": 1.0,
+        "source_recall@1": 1.0,
+        "source_recall@10": 1.0,
+        "source_recall@5": 1.0
+      }
+    }
+  },
+  "misses": [
+    {
+      "id": "gst_001",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_002",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_003",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_004",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_005",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_006",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_007",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_008",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_009",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_010",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_011",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_012",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_013",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_014",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_015",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_016",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_017",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_018",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_019",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_020",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_021",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_022",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_023",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_024",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_025",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_026",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_027",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_028",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_029",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "gst_030",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "tax_audit_003",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "tax_audit_008",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "tax_audit_009",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "tax_audit_011",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "tax_audit_012",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "accounting_002",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "accounting_003",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "accounting_004",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "accounting_005",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "accounting_006",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "accounting_007",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "accounting_008",
+      "method": "clause",
+      "retrieved": []
+    },
+    {
+      "id": "accounting_009",
+      "method": "clause",
+      "retrieved": []
+    }
+  ],
+  "questions_scored": 50,
+  "skipped": [
+    {
+      "id": "tax_audit_001",
+      "reason": "expected pages not in corpus"
+    },
+    {
+      "id": "audit_001",
+      "reason": "expected source not in corpus"
+    }
+  ]
+}

@@ -129,6 +129,27 @@ ranges, legal freshness checks, or tenant authorization.
 
 The notebook integration and live Kaggle verification follow backend work.
 
+## Retrieval Benchmark
+
+`data/golden_testset.json` holds 52 hand-labelled questions (GST, tax audit,
+accounting, audit): expected sources, pages (`"file.pdf#9"`) and, where the
+reference extractor recognises them, sections (`gst_rule:36`). The pages were
+labelled by reading the bounded corpus the notebook builds (first 3 catalog
+sources, 30 pages each). The benchmark runs each question through hybrid
+retrieval and through dense, BM25 and clause search alone, and reports
+recall@1/5/10, MRR, section recall and latency:
+
+```bash
+python3 scripts/build_corpus.py /path/to/artifacts            # same bounds as the notebook; or use Kaggle artifacts
+python3 scripts/benchmark_retrieval.py --artifacts /path/to/artifacts                   # gate
+python3 scripts/benchmark_retrieval.py --artifacts /path/to/artifacts --write-baseline  # after golden-set changes
+```
+
+The gate exits 1 if a hybrid quality metric falls more than 0.02 below
+`data/retrieval_baseline.json`. Questions whose source, or whose labelled pages,
+are not in the loaded corpus are skipped and listed, so a bounded build is not
+read as a retrieval failure. Reports go to `data/benchmark/` (git-ignored).
+
 ## Retrieval Fine-tuning
 
 Notebook Sections 7-10 fine-tune the embedding model on your own corpus:

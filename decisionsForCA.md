@@ -38,6 +38,11 @@ decision is reversed, add a new entry and mark the old one **Superseded by D-xx*
 | [D-23](#d-23-typed-claims-explain-the-calculation-never-replace-it) | 2026-10-16 | Typed claims explain the calculation, never replace it | Accepted |
 | [D-24](#d-24-numbers-in-claims-must-match-cited-evidence) | 2026-10-16 | Numbers in claims must match cited evidence | Accepted |
 | [D-25](#d-25-general-answers-are-paraphrases-backed-by-whole-sentence-quotes) | 2026-10-17 | General answers are paraphrases backed by whole-sentence quotes | Accepted |
+| [D-26](#d-26-web-chat-fastapi-server-nextjs-client-streaming-over-post) | 2026-10-19 | Web chat: FastAPI server, Next.js client, streaming over POST | Accepted |
+| [D-27](#d-27-client-profile-lives-on-the-server-per-conversation) | 2026-10-19 | Client profile lives on the server, per conversation | Accepted |
+| [D-28](#d-28-sqlite-store-with-one-locked-connection) | 2026-10-19 | SQLite store with one locked connection | Accepted |
+| [D-29](#d-29-server-runs-without-a-knowledge-base) | 2026-10-19 | Server runs without a knowledge base | Accepted |
+| [D-30](#d-30-retrieval-benchmark-per-method-gated-against-a-baseline) | 2026-10-28 | Retrieval benchmark per method, gated against a baseline | Accepted |
 
 ---
 
@@ -731,3 +736,60 @@ UI can be built and tested without a Kaggle download.
 
 **Trade-offs.** A misconfigured path quietly gives a calculator-only assistant;
 the banner is the only signal.
+
+---
+
+## D-30 Retrieval benchmark per method, gated against a baseline
+
+**Date:** 2026-10-28 · **Status:** Accepted
+
+**Context.** The Phase 1 exit condition needs retrieval quality protected by a
+regression gate. The fine-tuning eval (D-14, D-15) scores synthetic questions
+against the chunk they came from; it says nothing about questions a CA would ask.
+The old `EvaluationRunner` reported hybrid-only MRR and coverage with no gate.
+
+**Decision.** `evaluation/retrieval_benchmark.py` scores hand-labelled golden
+questions through hybrid retrieval and through each method alone: source and
+page recall@1/5/10, MRR@10, section recall, p50/p95 latency, and hybrid results
+by category. `scripts/benchmark_retrieval.py` compares hybrid quality metrics
+with `data/retrieval_baseline.json` and exits 1 on a drop of more than 0.02.
+Questions whose expected source, or whose labelled pages, are not in the loaded
+corpus are skipped and listed. Golden questions gained an optional
+`expected_pages` (`source#page`).
+
+The golden set has 52 questions (30 GST, 12 tax audit, 9 accounting, 1 audit),
+labelled by reading the bounded corpus the notebook builds: the first three
+catalog sources, 30 pages each. `scripts/build_corpus.py` reproduces that corpus
+locally. The first baseline (28 October 2026) comes from that local build
+(pypdf, 188 chunks, bge-small): hybrid page recall@1 0.78, @5 0.98, page MRR@10
+0.86; 50 of 52 questions scorable.
+
+**Why.** Per-method numbers show which method a regression came from and whether
+fusion beats its best single method. Skipping out-of-corpus questions and pages
+keeps the bounded corpus from reading as a retrieval failure. Latency is not
+gated because it depends on the machine. Section labels are used only where the
+reference extractor is right (`gst_rule:N`, `accounting_standard:as_1`); it
+truncates `44AB` to `44a`, files Income-tax Rule 6G as a GST rule, and does not
+extract Form 3CD clauses, so tax-audit questions carry page labels only.
+
+**What the first run showed.**
+- Fusion does not beat BM25 on this corpus: BM25 page MRR@10 0.88 against hybrid
+  0.86 and dense 0.82. The RRF weights were never tuned on labelled data.
+- Clause search only fires when the question cites a rule or standard number
+  (7 of 50 questions), so it contributes nothing to most natural questions.
+- Tax-audit page recall@1 is 0.55 because the guidance note repeats the
+  section 44AB text on several pages; the labels accept each of them.
+
+**Trade-offs.**
+- The baseline must be rewritten whenever the golden set changes; the gate
+  refuses to compare otherwise, so a weaker baseline can be committed with it.
+- A fixed 0.02 tolerance is noisy on 50 questions (one question moves recall by
+  0.02).
+- The baseline comes from a pypdf build; the Kaggle corpus uses PyMuPDF and
+  chunks differently (178 chunks), so the first Kaggle run may need to rewrite
+  it.
+- `pipeline.evaluate` still uses the older `EvaluationRunner`.
+
+**Revisit when.** The gate runs on Kaggle or in CI, RRF weights are tuned against
+the golden set, the reference extractor is fixed (then add section labels for
+tax audit), or `EvaluationRunner` can be retired.

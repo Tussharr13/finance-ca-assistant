@@ -3,7 +3,7 @@
 > Living document. Update this file whenever a capability is implemented,
 > removed, validated, or moved between roadmap phases.
 
-**Last reviewed:** 20 July 2026  
+**Last reviewed:** 28 October 2026  
 **Current phase:** Phase 1 — Retrieval quality  
 **Runtime:** Kaggle-first prototype  
 **Source of truth:** This repository
@@ -194,10 +194,14 @@ stored or governed as though they were the same type of information.
 ## 3. Current implemented architecture
 
 The current system is a resource-conscious Kaggle prototype that ingests a
-small authoritative CA corpus and demonstrates hybrid retrieval.
+small authoritative CA corpus and demonstrates hybrid retrieval, plus a local
+web chat (FastAPI server and Next.js client) over the same pipeline.
 
-It is **not yet** a broad financial expert and does **not yet** generate a real
-model-based CA answer in the default Kaggle configuration.
+Salary-tax consultations are answered by a deterministic regime calculator.
+An LLM is optional: with one, it explains calculations through typed claims and
+answers general questions with quote-backed claims; without one, general
+questions abstain. It is **not yet** a broad financial expert, and real-model
+claim acceptance rates are unmeasured.
 
 ```mermaid
 flowchart LR
@@ -215,9 +219,13 @@ flowchart LR
     Clause[Clause and section lookup]
     Fusion[Weighted hybrid merge]
     Rerank[Explicitly configured reranker only]
-    Answer[Structured answer scaffold]
+    Answer[Quote-backed claims or abstain]
     Consult[Salary-tax fact gathering]
+    Calc[Income-tax regime calculator]
+    Claims[Typed-claim explanation]
     Artifacts[Chunks, embeddings and clause index]
+    Server[FastAPI server and SQLite store]
+    Web[Next.js chat]
 
     Cache --> Chunks
     URLs --> Download --> Manifest --> PDF --> Chunk --> Metadata --> Chunks
@@ -228,8 +236,10 @@ flowchart LR
     BM25 --> Fusion
     Clause --> Fusion
     Fusion --> Rerank --> Answer
-    Fusion --> Consult
+    Fusion --> Consult --> Calc --> Claims
     Answer --> Artifacts
+    Web --> Server --> Answer
+    Server --> Consult
 ```
 
 ### 3.1 Current Kaggle configuration
@@ -244,10 +254,10 @@ flowchart LR
 | Latest observed notebook corpus | 178 chunks across 3 sources |
 | Embedding provider | `BAAI/bge-small-en-v1.5`, 384 dimensions |
 | Heavy Hugging Face reranker | Disabled |
-| Hugging Face LLM | Disabled |
-| Default answer model | Conservative `EchoLLM` fallback |
+| Hugging Face LLM | Disabled by default (`ENABLE_HF_LLM = False`, `Qwen/Qwen3-0.6B`); use Qwen3-4B for typed claims (D-23) |
+| Default answer model | None: general questions abstain; calculations answer without an LLM |
 | Storage | Kaggle working directory and optionally attached dataset |
-| Automated test status | 33 tests passing at last review |
+| Automated test status | 144 tests; 138 pass locally, 6 server tests need fastapi ≥ 0.115 (see `server/requirements.txt`) |
 
 These numbers describe the currently observed bounded notebook run. Update them
 when corpus limits, models, or notebook outputs change.
@@ -270,29 +280,38 @@ when corpus limits, models, or notebook outputs change.
 - Structured answer fields for evidence, confidence, CA analysis, risks,
   missing information, next steps, disclaimer, and diagnostics.
 - Unsupported section/reference detection against retrieved chunks.
-- A first salary-tax consultation flow that asks for missing client facts.
+- Salary-tax consultation that asks only for the facts the calculation needs
+  (D-19) and continues across follow-up turns (D-22).
+- Deterministic old/new regime calculator with HRA exemption, common
+  deductions, rebate and surcharge, driven by effective-dated rules (D-11, D-12).
+- Typed-claim explanations of calculations; invalid claims are dropped and
+  numbers must match cited evidence (D-23, D-24).
+- General answers as paraphrases backed by whole-sentence quotes; any failed
+  claim abstains the whole answer (D-25).
+- FastAPI server with streamed status steps, per-conversation client profiles
+  in SQLite, and a Next.js chat client (D-26 to D-29). Local use only.
 - Artifact output for chunks, embeddings, and clause index.
-- Retrieval evaluation types for MRR, source coverage, and section recall.
+- Retrieval benchmark per method (hybrid, dense, BM25, clause) on 52 labelled questions, with a regression gate against a committed baseline and a local corpus build script (D-30).
 
 ### 3.3 Current limitations
 
 | Area | Current limitation |
 |---|---|
 | Knowledge coverage | The bounded corpus is too narrow for the intended product. It does not contain sufficient evidence for the salary-tax demonstration. |
-| Generation | The real LLM is disabled by default, so output is a conservative template rather than a substantive expert answer. |
+| Generation | The LLM is optional and off by default. Real-model acceptance rates for typed claims (D-23) and quoted claims (D-25) are unmeasured. |
 | Reranking | Backend defaults to no reranker. Keyword and Hugging Face rerankers require explicit configuration; notebook status text still needs updating. |
 | Persistence | Saved embeddings and clause mappings can be reloaded; the lightweight BM25 index is still rebuilt in memory. |
 | Cache correctness | Chunks are fingerprinted by source metadata and ingestion settings, but source updates are not fetched incrementally yet. |
 | Hybrid scoring | Weighted reciprocal rank fusion avoids incompatible raw-score scales. Weights and relevance quality still need corpus evaluation; fusion scores are not confidence probabilities. |
-| Citations | Generation accepts only complete exact chunk extracts with unique IDs and source/page attribution; any invalid claim blocks the answer. Semantic support and applicability remain unverified. |
+| Citations | Each general-answer claim needs a sentence-aligned quote from one chunk; checks are lexical (negation, conditions, numbers, key words), so meaning shifts such as "may" → "must" can pass. Applicability remains unverified. |
 | Confidence | Always `not_assessed`; evidence status reports quote matching separately. No chunk-count confidence. |
-| Citation validator | Exact-extract checks are integrated into generation. Legacy token overlap is not an acceptance gate. See [citation policy](citation-enforcement.md). |
-| Consultation | Only a heuristic salary-tax workflow exists. Other topics pass directly to ordinary RAG. |
-| Conversation state | `history` is accepted by the API but is not used. Client profiles are not persisted. |
-| Calculations | There is no tax, regime, HRA, TDS, GST, cash-flow, portfolio, or property calculation engine. |
+| Citation validator | Quote checks are integrated into generation; see [citation policy](citation-enforcement.md). |
+| Consultation | Only salary tax has a workflow; topic is inferred per message by keywords. Other topics go to ordinary RAG. Fact parsing is regex-based (D-07). |
+| Conversation state | The server stores each conversation's client profile (D-27), but users cannot see or correct it. `history` is still unused. |
+| Calculations | Only salary income tax (both regimes, HRA). No TDS, capital gains, GST, cash-flow, portfolio, or property calculators. |
 | Documents | OCR and table processing are extension points only; scanned documents and structured tables are not handled. |
-| Evaluation | The golden retrieval set is tiny and does not contain expert-complete reference answers. |
-| Product platform | There is no production API, UI, authentication, encrypted storage, monitoring, or scheduled source refresh. |
+| Evaluation | The golden set covers only the bounded 3-source corpus (first 30 pages each) and has short reference answers, not expert-complete ones. Fusion does not yet beat BM25 on it; RRF weights are untuned. |
+| Product platform | A local web chat exists, but there is no authentication, rate limiting, encrypted storage, monitoring, or scheduled source refresh. |
 
 ## 4. Roadmap
 
@@ -345,7 +364,7 @@ retrieval artifacts, and can reuse the corpus instead of rebuilding it.
 - [ ] Add OCR and table extraction.
 - [x] Replace raw-score addition with weighted reciprocal rank fusion (backend regression-tested).
 - [x] Apply exact metadata filters across dense, BM25, and clause search before truncation.
-- [ ] Benchmark retrieval quality on representative, labelled questions; enforce date applicability separately from exact metadata matching.
+- [ ] Benchmark retrieval quality on representative, labelled questions; enforce date applicability separately from exact metadata matching. *(Benchmark, 52 labelled questions and first baseline committed (D-30); date applicability not built.)*
 - [x] Enforce exact-extract claim citations and fail-closed abstention in the backend.
 - [x] Remove chunk-count confidence; report unassessed confidence and separate attribution status.
 - [ ] Evaluate semantic support, relevance, freshness, and applicability before introducing evidence-quality confidence.
@@ -359,13 +378,15 @@ protected by a regression gate.
 
 ### Phase 2 — Grounded CA copilot
 
-- [ ] Enable a small instruction LLM with strict structured output.
-- [ ] Add deterministic tax-regime, HRA, TDS, capital-gain, and GST calculators.
+- [ ] Enable a small instruction LLM with strict structured output. *(Structured, validated output built (D-23, D-25); off by default until acceptance rates are measured.)*
+- [x] Add deterministic tax-regime and HRA calculators.
+- [ ] Add deterministic TDS, capital-gain, and GST calculators.
 - [ ] Support Form 16, salary slips, invoices, returns, and notice extraction.
-- [ ] Persist permissioned client facts across consultation turns.
-- [ ] Add specialist workflows for salary tax, GST, tax audit, and accounting.
-- [ ] Block unsupported claims and require evidence for material conclusions.
-- [ ] Produce calculation sheets, assumptions, document lists, and next actions.
+- [ ] Persist permissioned client facts across consultation turns. *(Persisted per conversation (D-27); consent and user-visible correction not built.)*
+- [x] Add a specialist workflow for salary tax.
+- [ ] Add specialist workflows for GST, tax audit, and accounting.
+- [x] Block unsupported claims and require evidence for material conclusions.
+- [ ] Produce calculation sheets, assumptions, document lists, and next actions. *(Salary tax replies list assumptions, exclusions and evidence to keep (D-18); no exportable sheet.)*
 
 **Exit condition:** Answers are useful, cited, reproducible, and based on the
 required client facts. Calculated values match independently tested calculators.
@@ -398,7 +419,7 @@ regulated or consequential recommendations have appropriate human accountability
 
 ### Phase 5 — Production platform
 
-- [ ] Web/mobile client experience.
+- [ ] Web/mobile client experience. *(Local web chat built (D-26); no mobile, auth, or deployment.)*
 - [ ] API-based orchestration and separate background workers.
 - [ ] Persistent vector, relational, and document storage.
 - [ ] Authentication, authorization, encryption, consent, and deletion controls.

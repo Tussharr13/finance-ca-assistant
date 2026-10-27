@@ -3,19 +3,788 @@
     "id": "tax_audit_001",
     "question": "What does Form 3CD clause 44 require?",
     "category": "tax_audit",
-    "correct_sources": ["ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"],
-    "expected_sections": ["form_3cd:44"],
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [
+      "form_3cd:44"
+    ],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#273",
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#274",
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#275",
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#278",
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#279"
+    ],
     "difficulty": "easy",
-    "correct_answer": ""
+    "correct_answer": "Break-up of total expenditure into GST-registered and unregistered entities (clause 44, para 82)."
   },
   {
     "id": "audit_001",
     "question": "What does SA 500 say about audit evidence?",
     "category": "audit",
-    "correct_sources": ["ICAI_SA_500_Audit_Evidence.pdf"],
-    "expected_sections": ["audit_standard:sa_500"],
+    "correct_sources": [
+      "ICAI_SA_500_Audit_Evidence.pdf"
+    ],
+    "expected_sections": [
+      "audit_standard:sa_500"
+    ],
+    "expected_pages": [],
     "difficulty": "easy",
     "correct_answer": ""
+  },
+  {
+    "id": "gst_001",
+    "question": "What is the rate of tax under the composition levy for manufacturers?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#7"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "One per cent for manufacturers (rule 7)."
+  },
+  {
+    "id": "gst_002",
+    "question": "Which form is used to intimate the option to pay tax under the composition levy?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [
+      "gst_rule:3"
+    ],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#5"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "FORM GST CMP-01 (provisional registrants) or CMP-02 (registered persons), per rule 3."
+  },
+  {
+    "id": "gst_003",
+    "question": "What conditions must a person opting for the composition scheme comply with?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#5",
+      "CGST_Rules_2017_CBIC.pdf#6"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Rule 5: not a casual or non-resident taxable person, stock not from inter-State purchases, pay tax on reverse-charge inward supplies, display 'composition taxable person'."
+  },
+  {
+    "id": "gst_004",
+    "question": "If a composition dealer stops satisfying the conditions, which form must be filed and within how many days?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#6"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "FORM GST CMP-04 within seven days of the event (rule 6)."
+  },
+  {
+    "id": "gst_005",
+    "question": "Within how many working days must the proper officer approve a GST registration application?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#9"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "Three working days from submission; seven working days after a clarification (rule 9)."
+  },
+  {
+    "id": "gst_006",
+    "question": "What are the components of the Goods and Services Tax Identification Number shown on the registration certificate?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [
+      "gst_rule:9"
+    ],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#9"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Two characters State code, ten characters PAN or TAN, two characters entity code, one checksum character (rule 10)."
+  },
+  {
+    "id": "gst_007",
+    "question": "When is GST registration effective if the application is filed within thirty days of becoming liable?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [
+      "gst_rule:9"
+    ],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#9",
+      "CGST_Rules_2017_CBIC.pdf#10"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "From the date the person became liable to registration (rule 10(2))."
+  },
+  {
+    "id": "gst_008",
+    "question": "How does a non-resident taxable person apply for GST registration?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#11"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "FORM GST REG-09 with a self-attested passport copy, at least five days before commencing business (rule 13)."
+  },
+  {
+    "id": "gst_009",
+    "question": "Within how many days must a registered person apply to amend registration particulars after a change?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#13"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Fifteen days, in FORM GST REG-14 (rule 19)."
+  },
+  {
+    "id": "gst_010",
+    "question": "Which form is used to apply for cancellation of GST registration and within what period?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [
+      "gst_rule:20"
+    ],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#14"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "FORM GST REG-16 within thirty days of the event warranting cancellation (rule 20)."
+  },
+  {
+    "id": "gst_011",
+    "question": "Can a voluntarily registered person apply to cancel registration within the first year?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#14"
+    ],
+    "difficulty": "hard",
+    "correct_answer": "No: rule 20 bars cancellation applications before one year from the effective date of a voluntary registration."
+  },
+  {
+    "id": "gst_012",
+    "question": "What is the time limit to apply for revocation of cancellation of registration?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#15"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "Thirty days from service of the cancellation order, in FORM GST REG-21 (rule 23)."
+  },
+  {
+    "id": "gst_013",
+    "question": "Must a company use a digital signature certificate for GST filings?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#16",
+      "CGST_Rules_2017_CBIC.pdf#17"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Yes: rule 26 requires persons registered under the Companies Act to verify documents through a digital signature certificate."
+  },
+  {
+    "id": "gst_014",
+    "question": "How is the value of supply determined when the consideration is not wholly in money?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#18"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "Rule 27: open market value, else money plus money-equivalent of non-money consideration, else like kind and quality, else rules 30/31."
+  },
+  {
+    "id": "gst_015",
+    "question": "How is value determined for supplies between related or distinct persons when the recipient is eligible for full input tax credit?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [
+      "gst_rule:30"
+    ],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#18"
+    ],
+    "difficulty": "hard",
+    "correct_answer": "The invoice value is deemed the open market value (second proviso to rule 28)."
+  },
+  {
+    "id": "gst_016",
+    "question": "What is the value of supply based on cost under the CGST rules?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [
+      "gst_rule:30"
+    ],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#19"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "110 per cent of cost of production, acquisition or provision (rule 30)."
+  },
+  {
+    "id": "gst_017",
+    "question": "How is the value of supply determined for money changing or foreign currency exchange services?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#19",
+      "CGST_Rules_2017_CBIC.pdf#20"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Rule 32(2): difference from the RBI reference rate times units, or the slab-based percentage option."
+  },
+  {
+    "id": "gst_018",
+    "question": "What is the deemed value of an air travel agent's service for booking tickets?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#20"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "Five per cent of basic fare for domestic and ten per cent for international bookings (rule 32(3))."
+  },
+  {
+    "id": "gst_019",
+    "question": "How is the value of supply of life insurance services determined?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#20"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Rule 32(4): gross premium less investment allocation, or 10 per cent of single premium, or 25 per cent first year and 12.5 per cent later."
+  },
+  {
+    "id": "gst_020",
+    "question": "How is the value of a supply of second-hand goods determined when no input tax credit was availed?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#20",
+      "CGST_Rules_2017_CBIC.pdf#21"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Difference between selling price and purchase price; a negative value is ignored (rule 32(5))."
+  },
+  {
+    "id": "gst_021",
+    "question": "What conditions must a pure agent satisfy for its expenditure to be excluded from the value of supply?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#21"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "Rule 33: acts as pure agent on authorisation, shows the payment separately in the invoice, and the procured supplies are in addition to its own services."
+  },
+  {
+    "id": "gst_022",
+    "question": "How is the tax amount computed when the value of supply is inclusive of GST?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#22"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Tax = value inclusive of taxes x tax rate / (100 + sum of tax rates) (rule 35)."
+  },
+  {
+    "id": "gst_023",
+    "question": "On the basis of which documents can a registered person avail input tax credit?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [
+      "gst_rule:36"
+    ],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#23"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "Rule 36: supplier invoice, reverse-charge invoice, debit note, bill of entry, or Input Service Distributor invoice or credit note."
+  },
+  {
+    "id": "gst_024",
+    "question": "What happens to input tax credit if the recipient does not pay the supplier within 180 days?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#23"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Rule 37: the proportionate credit is added to output tax liability with interest under section 50; it can be re-availed on payment."
+  },
+  {
+    "id": "gst_025",
+    "question": "How much input tax credit can a banking company or financial institution claim under the 50 per cent option?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#24"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Rule 38: fifty per cent of the remaining input tax after excluding non-business and blocked credits."
+  },
+  {
+    "id": "gst_026",
+    "question": "How does an Input Service Distributor apportion input tax credit among recipients?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#24",
+      "CGST_Rules_2017_CBIC.pdf#25"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Rule 39: pro rata to turnover, C1 = (t1 / T) x C, distributed in the same month through FORM GSTR-6."
+  },
+  {
+    "id": "gst_027",
+    "question": "When must a declaration in FORM GST ITC-01 be certified by a chartered accountant?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#26"
+    ],
+    "difficulty": "hard",
+    "correct_answer": "Rule 40: when the aggregate credit claimed exceeds two lakh rupees."
+  },
+  {
+    "id": "gst_028",
+    "question": "How is unutilised input tax credit transferred on the sale, merger or demerger of a business?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#27"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Rule 41: FORM GST ITC-02 with a CA or cost accountant certificate; on demerger, apportioned by asset value."
+  },
+  {
+    "id": "gst_029",
+    "question": "How is the common input tax credit attributable to exempt supplies calculated for inputs and input services?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [
+      "gst_rule:42"
+    ],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#27",
+      "CGST_Rules_2017_CBIC.pdf#28"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Rule 42: D1 = (E / F) x C2, where E is exempt supplies and F is total turnover in the State."
+  },
+  {
+    "id": "gst_030",
+    "question": "What useful life is assumed for capital goods when reversing input tax credit, and how is the monthly credit computed?",
+    "category": "gst",
+    "correct_sources": [
+      "CGST_Rules_2017_CBIC.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "CGST_Rules_2017_CBIC.pdf#29",
+      "CGST_Rules_2017_CBIC.pdf#30"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Rule 43: five years from the invoice date; Tm = Tc / 60."
+  },
+  {
+    "id": "tax_audit_002",
+    "question": "What is the turnover threshold for tax audit under section 44AB for a person carrying on business?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#26",
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#28"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "One crore rupees, raised to ten crore where cash receipts and cash payments each do not exceed five per cent."
+  },
+  {
+    "id": "tax_audit_003",
+    "question": "When does tax audit become applicable to a person carrying on a profession?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#26",
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#29"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "When gross receipts in profession exceed fifty lakh rupees in any previous year (section 44AB(b))."
+  },
+  {
+    "id": "tax_audit_004",
+    "question": "Which forms are prescribed under Rule 6G for the tax audit report and the statement of particulars?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#30"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "Form 3CA (accounts audited under another law) or Form 3CB, with particulars in Form 3CD."
+  },
+  {
+    "id": "tax_audit_005",
+    "question": "What is the specified date by which the tax audit report under section 44AB must be furnished?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#28"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "One month prior to the due date for furnishing the return of income under section 139(1)."
+  },
+  {
+    "id": "tax_audit_006",
+    "question": "When was tax audit under section 44AB introduced and from which assessment year?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#25"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Inserted by section 11 of the Finance Act, 1984 with effect from 1 April 1985 (AY 1985-86)."
+  },
+  {
+    "id": "tax_audit_007",
+    "question": "Is a person declaring presumptive income under section 44AD(1) required to get a tax audit?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#27",
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#29"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "No, where turnover does not exceed two crore rupees (first proviso; amended by Finance Act 2023 from AY 2024-25)."
+  },
+  {
+    "id": "tax_audit_008",
+    "question": "If a company's accounts are already audited under the Companies Act, is a separate tax audit required?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#28",
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#30"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "No separate audit: the third proviso accepts the statutory audit plus a further report in Form 3CA."
+  },
+  {
+    "id": "tax_audit_009",
+    "question": "What is the objective of a tax audit?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#22"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "To report particulars in Form 3CD and assure proper books, easing verification by Assessing Officers (para 1.4)."
+  },
+  {
+    "id": "tax_audit_010",
+    "question": "What did the Supreme Court hold in T.D. Venkata Rao v. Union of India about section 44AB?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#25",
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#26"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "It upheld the vires of section 44AB: chartered accountants have special aptitude for audits."
+  },
+  {
+    "id": "tax_audit_011",
+    "question": "Which clause of Form 3CD should a company select as the applicable section for tax audit?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#30"
+    ],
+    "difficulty": "hard",
+    "correct_answer": "The third proviso to section 44AB in clause 8 of Form 3CD, since its accounts are audited under another law (para 3.5)."
+  },
+  {
+    "id": "tax_audit_012",
+    "question": "Does an assessee with units at different places need separate tax audit reports for each unit?",
+    "category": "tax_audit",
+    "correct_sources": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf"
+    ],
+    "expected_sections": [],
+    "expected_pages": [
+      "ICAI_Tax_Audit_44AB_Guidance_Note_2023.pdf#30"
+    ],
+    "difficulty": "hard",
+    "correct_answer": "No: section 44AB covers the complete set of accounts for all units together (para 3.6)."
+  },
+  {
+    "id": "accounting_001",
+    "question": "What are the fundamental accounting assumptions under AS 1?",
+    "category": "accounting",
+    "correct_sources": [
+      "ICAI_AS_1_Accounting_Policies.pdf"
+    ],
+    "expected_sections": [
+      "accounting_standard:as_1"
+    ],
+    "expected_pages": [
+      "ICAI_AS_1_Accounting_Policies.pdf#2",
+      "ICAI_AS_1_Accounting_Policies.pdf#3",
+      "ICAI_AS_1_Accounting_Policies.pdf#6"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "Going concern, consistency and accrual (paras 9-10, 27)."
+  },
+  {
+    "id": "accounting_002",
+    "question": "What are the major considerations governing the selection of accounting policies?",
+    "category": "accounting",
+    "correct_sources": [
+      "ICAI_AS_1_Accounting_Policies.pdf"
+    ],
+    "expected_sections": [
+      "accounting_standard:as_1"
+    ],
+    "expected_pages": [
+      "ICAI_AS_1_Accounting_Policies.pdf#4",
+      "ICAI_AS_1_Accounting_Policies.pdf#5"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "Prudence, substance over form and materiality (para 17)."
+  },
+  {
+    "id": "accounting_003",
+    "question": "How should a change in accounting policy with a material effect be disclosed?",
+    "category": "accounting",
+    "correct_sources": [
+      "ICAI_AS_1_Accounting_Policies.pdf"
+    ],
+    "expected_sections": [
+      "accounting_standard:as_1"
+    ],
+    "expected_pages": [
+      "ICAI_AS_1_Accounting_Policies.pdf#5",
+      "ICAI_AS_1_Accounting_Policies.pdf#6"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Disclose the change and the amount of the effect to the extent ascertainable, or state that it is not ascertainable (paras 22, 26)."
+  },
+  {
+    "id": "accounting_004",
+    "question": "Give examples of areas in which different accounting policies may be adopted by enterprises.",
+    "category": "accounting",
+    "correct_sources": [
+      "ICAI_AS_1_Accounting_Policies.pdf"
+    ],
+    "expected_sections": [
+      "accounting_standard:as_1"
+    ],
+    "expected_pages": [
+      "ICAI_AS_1_Accounting_Policies.pdf#4"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "Depreciation, construction-period expenditure, foreign currency, inventories, goodwill, investments, retirement benefits, long-term contracts, fixed assets, contingent liabilities (para 14)."
+  },
+  {
+    "id": "accounting_005",
+    "question": "Is specific disclosure required when going concern, consistency and accrual are followed?",
+    "category": "accounting",
+    "correct_sources": [
+      "ICAI_AS_1_Accounting_Policies.pdf"
+    ],
+    "expected_sections": [
+      "accounting_standard:as_1"
+    ],
+    "expected_pages": [
+      "ICAI_AS_1_Accounting_Policies.pdf#2",
+      "ICAI_AS_1_Accounting_Policies.pdf#6"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "No; disclosure is required only when a fundamental assumption is not followed (paras 9, 27)."
+  },
+  {
+    "id": "accounting_006",
+    "question": "What is the purpose of the standard on disclosure of accounting policies?",
+    "category": "accounting",
+    "correct_sources": [
+      "ICAI_AS_1_Accounting_Policies.pdf"
+    ],
+    "expected_sections": [
+      "accounting_standard:as_1"
+    ],
+    "expected_pages": [
+      "ICAI_AS_1_Accounting_Policies.pdf#1",
+      "ICAI_AS_1_Accounting_Policies.pdf#2"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Better understanding and comparability of financial statements through disclosure of significant policies (para 8)."
+  },
+  {
+    "id": "accounting_007",
+    "question": "Where should significant accounting policies be disclosed in the financial statements?",
+    "category": "accounting",
+    "correct_sources": [
+      "ICAI_AS_1_Accounting_Policies.pdf"
+    ],
+    "expected_sections": [
+      "accounting_standard:as_1"
+    ],
+    "expected_pages": [
+      "ICAI_AS_1_Accounting_Policies.pdf#5",
+      "ICAI_AS_1_Accounting_Policies.pdf#6"
+    ],
+    "difficulty": "easy",
+    "correct_answer": "As part of the financial statements, normally in one place (paras 19-20, 25)."
+  },
+  {
+    "id": "accounting_008",
+    "question": "Can disclosure of an accounting policy remedy a wrong treatment of an item in the accounts?",
+    "category": "accounting",
+    "correct_sources": [
+      "ICAI_AS_1_Accounting_Policies.pdf"
+    ],
+    "expected_sections": [
+      "accounting_standard:as_1"
+    ],
+    "expected_pages": [
+      "ICAI_AS_1_Accounting_Policies.pdf#5"
+    ],
+    "difficulty": "hard",
+    "correct_answer": "No (para 23)."
+  },
+  {
+    "id": "accounting_009",
+    "question": "What does the prudence consideration require about anticipated profits and known liabilities?",
+    "category": "accounting",
+    "correct_sources": [
+      "ICAI_AS_1_Accounting_Policies.pdf"
+    ],
+    "expected_sections": [
+      "accounting_standard:as_1"
+    ],
+    "expected_pages": [
+      "ICAI_AS_1_Accounting_Policies.pdf#4"
+    ],
+    "difficulty": "medium",
+    "correct_answer": "Profits are recognised only when realised; provision is made for all known liabilities and losses (para 17)."
   }
 ]
-

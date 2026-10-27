@@ -19,6 +19,8 @@ data/processed/
 data/indices/
 data/*.json
 !data/golden_testset.json
+!data/retrieval_baseline.json
+data/benchmark/
 
 *.npz
 *.pkl

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
 
@@ -19,6 +19,8 @@ class GoldenQuestion:
     expected_sections: List[str]
     difficulty: str = "medium"
     correct_answer: str = ""
+    # "source#page" keys, as built by finetuning.dataset.page_key.
+    expected_pages: List[str] = field(default_factory=list)
 
 
 DEFAULT_GOLDEN_QUESTIONS = [
